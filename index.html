@@ -5,34 +5,38 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - Muni La Serena</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
     <link href="style.css" rel="stylesheet">
 </head>
-<body class="d-flex align-items-center justify-content-center" style="height: 100vh;">
+<body class="d-flex align-items-center justify-content-center" style="min-height: 100vh;">
 
     <div class="card glass-card p-4" style="width: 100%; max-width: 420px;">
         <div class="text-center mb-4">
-            <h3 style="color: #8B1E28;">I. MUNICIPALIDAD DE LA SERENA</h3>
-            <h5 class="text-muted">Gestión Territorial 2024-2028</h5>
+            <h3 style="color: #8B1E28;" class="fw-bold">I. MUNICIPALIDAD DE LA SERENA</h3>
+            <h6 class="text-muted">Gestión Territorial SGR</h6>
         </div>
         
         <form id="loginForm" novalidate>
             <div class="mb-3">
                 <label class="form-label fw-bold">RUT del Funcionario</label>
                 <input type="text" class="form-control" id="rut" placeholder="12345678-9" required>
-                <div class="invalid-feedback" id="rutError">Ingrese un RUT válido con guion.</div>
+                <div class="invalid-feedback">Ingrese un RUT válido con guion.</div>
             </div>
-            <div class="mb-4">
+            <div class="mb-3">
                 <label class="form-label fw-bold">Contraseña</label>
                 <input type="password" class="form-control" id="password" required>
-                <div class="invalid-feedback" id="passError">La contraseña debe tener mínimo 8 caracteres, incluir letras y números.</div>
+                <div class="invalid-feedback">Mínimo 8 caracteres, al menos una letra y un número.</div>
+            </div>
+            <div class="text-end mb-4">
+                <a href="recuperar.html" class="text-decoration-none small" style="color: #8B1E28;">¿Olvidaste tu contraseña?</a>
             </div>
             <button type="submit" class="btn btn-muni w-100 py-2">Acceder al Sistema</button>
         </form>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        // Función para validar RUT Chileno (Módulo 11)
         function validaRut(rutCompleto) {
             if (!/^[0-9]+-[0-9kK]{1}$/.test(rutCompleto)) return false;
             let tmp = rutCompleto.split('-');
@@ -47,35 +51,35 @@
 
         document.getElementById('loginForm').addEventListener('submit', function(event) {
             event.preventDefault();
-            
             const rutInput = document.getElementById('rut');
             const passInput = document.getElementById('password');
             let esValido = true;
 
-            // Validar RUT
             if (!validaRut(rutInput.value)) {
                 rutInput.classList.add('is-invalid');
-                rutInput.classList.remove('is-valid');
                 esValido = false;
             } else {
                 rutInput.classList.remove('is-invalid');
-                rutInput.classList.add('is-valid');
             }
 
-            // Validar Contraseña (Min 8 chars, 1 letra, 1 numero)
             const passRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{8,}$/;
             if (!passRegex.test(passInput.value)) {
                 passInput.classList.add('is-invalid');
-                passInput.classList.remove('is-valid');
                 esValido = false;
             } else {
                 passInput.classList.remove('is-invalid');
-                passInput.classList.add('is-valid');
             }
 
-            // Redirigir si todo es válido
             if (esValido) {
-                window.location.href = 'dashboard.html';
+                Swal.fire({
+                    title: '¡Bienvenido!',
+                    text: 'Sesión iniciada correctamente en el sistema SGR.',
+                    icon: 'success',
+                    timer: 1500,
+                    showConfirmButton: false
+                }).then(() => {
+                    window.location.href = 'dashboard.html';
+                });
             }
         });
     </script>

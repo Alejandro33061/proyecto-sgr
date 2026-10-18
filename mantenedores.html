@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mantenedores - Muni La Serena</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+    <!-- Navbar Institucional con Encabezado Persistente -->
+    <nav class="navbar navbar-expand-lg navbar-dark bg-muni shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="dashboard.html">Muni La Serena</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menuPrincipal">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="menuPrincipal">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link text-white" href="dashboard.html">📊 Gestión Territorial</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="actividad.html">📝 Registrar Requerimiento</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="mantenedores.html">⚙️ Mantenedores</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="validar.html">📸 Validar Evidencias</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="reportes.html">📥 Reportes</a></li>
+                </ul>
+                <div class="d-flex align-items-center gap-3 text-white">
+                    <div class="text-end d-none d-md-block" style="font-size: 0.85rem; line-height: 1.2;">
+                        <span class="fw-bold d-block">Alan Von Kretschmann</span>
+                        <span class="badge bg-light text-dark">Rol: Administrador</span>
+                    </div>
+                    <a href="index.html" class="btn btn-outline-light btn-sm">Cerrar Sesión</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4 mb-5">
+        <h2 class="mb-3" style="color: #8B1E28;">Mantenedores del Sistema (CRUD)</h2>
+
+        <!-- Navegación por pestañas de los 6 Módulos requeridos -->
+        <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active btn-muni-tab" id="pills-delegaciones-tab" data-bs-toggle="pill" data-bs-target="#pills-delegaciones" type="button">🏢 Delegaciones</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link btn-muni-tab" id="pills-roles-tab" data-bs-toggle="pill" data-bs-target="#pills-roles" type="button">🛡️ Roles</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link btn-muni-tab" id="pills-usuarios-tab" data-bs-toggle="pill" data-bs-target="#pills-usuarios" type="button">👤 Usuarios</button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link btn-muni-tab" id="pills-metas-tab" data-bs-toggle="pill" data-bs-target="#pills-metas" type="button">🎯 Ítems / Metas</button>
+            </li>
+        </ul>
+
+        <div class="tab-content" id="pills-tabContent">
+            <!-- Pestaña CRUD Delegaciones -->
+            <div class="tab-pane fade show active" id="pills-delegaciones" role="tabpanel">
+                <div class="card glass-card p-4 shadow-sm">
+                    <div class="d-flex justify-content-between align-items-center mb-3">
+                        <h5 class="fw-bold m-0">Listado de Delegaciones Municipales</h5>
+                        <button class="btn btn-muni btn-sm" onclick="modalCrearDelegacion()">+ Nueva Delegación</button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle">
+                            <thead class="table-dark">
+                                <tr>
+                                    <th>ID</th>
+                                    <th>Nombre Delegación</th>
+                                    <th>Encargado(a)</th>
+                                    <th>Estado</th>
+                                    <th>Acciones</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tablaDelegaciones">
+                                <tr>
+                                    <td>1</td>
+                                    <td>Sector Centro</td>
+                                    <td>Alan Von Kretschmann</td>
+                                    <td><span class="badge bg-success">Activo</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editarDelegacion('Sector Centro')">Editar</button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarRegistro(this)">Eliminar</button>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td>2</td>
+                                    <td>Las Compañías</td>
+                                    <td>Pablo Cuadra Corrales</td>
+                                    <td><span class="badge bg-success">Activo</span></td>
+                                    <td>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editarDelegacion('Las Compañías')">Editar</button>
+                                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarRegistro(this)">Eliminar</button>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Otras pestañas (Simuladas) -->
+            <div class="tab-pane fade" id="pills-roles" role="tabpanel">
+                <div class="card glass-card p-4 shadow-sm">
+                    <h5 class="fw-bold">Gestión de Roles y Permisos</h5>
+                    <p class="text-muted">Administrador, Delegado Territorial, Revisor de Evidencia.</p>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="pills-usuarios" role="tabpanel">
+                <div class="card glass-card p-4 shadow-sm">
+                    <h5 class="fw-bold">Gestión de Funcionarios</h5>
+                    <p class="text-muted">Asignación de cuentas de usuario por RUT y Delegación.</p>
+                </div>
+            </div>
+            <div class="tab-pane fade" id="pills-metas" role="tabpanel">
+                <div class="card glass-card p-4 shadow-sm">
+                    <h5 class="fw-bold">Ítems y Metas de Gestión</h5>
+                    <p class="text-muted">Definición de objetivos de atención ciudadana anuales.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        function modalCrearDelegacion() {
+            Swal.fire({
+                title: 'Nueva Delegación',
+                html: `
+                    <input id="swal-nombre" class="swal2-input" placeholder="Nombre Delegación">
+                    <input id="swal-encargado" class="swal2-input" placeholder="Encargado(a)">
+                `,
+                focusConfirm: false,
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Guardar',
+                cancelButtonText: 'Cancelar',
+                preConfirm: () => {
+                    const nombre = document.getElementById('swal-nombre').value;
+                    const encargado = document.getElementById('swal-encargado').value;
+                    if (!nombre || !encargado) {
+                        Swal.showValidationMessage('Complete todos los campos');
+                    }
+                    return { nombre, encargado };
+                }
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    const tbody = document.getElementById('tablaDelegaciones');
+                    const newRow = `
+                        <tr>
+                            <td>${tbody.children.length + 1}</td>
+                            <td>${result.value.nombre}</td>
+                            <td>${result.value.encargado}</td>
+                            <td><span class="badge bg-success">Activo</span></td>
+                            <td>
+                                <button class="btn btn-sm btn-outline-primary" onclick="editarDelegacion('${result.value.nombre}')">Editar</button>
+                                <button class="btn btn-sm btn-outline-danger" onclick="eliminarRegistro(this)">Eliminar</button>
+                            </td>
+                        </tr>
+                    `;
+                    tbody.insertAdjacentHTML('beforeend', newRow);
+                    Swal.fire({ icon: 'success', title: 'Delegación Creada', confirmButtonColor: '#8B1E28' });
+                }
+            });
+        }
+
+        function editarDelegacion(nombre) {
+            Swal.fire({
+                title: 'Editar Delegación',
+                input: 'text',
+                inputValue: nombre,
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Actualizar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    Swal.fire({ icon: 'success', title: 'Registro Actualizado', confirmButtonColor: '#8B1E28' });
+                }
+            });
+        }
+
+        function eliminarRegistro(btn) {
+            Swal.fire({
+                title: '¿Está seguro?',
+                text: "Esta acción desactivará la delegación del sistema.",
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                cancelButtonColor: '#6c757d',
+                confirmButtonText: 'Sí, eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then((result) => {
+                if (result.isConfirmed) {
+                    btn.closest('tr').remove();
+                    Swal.fire({ icon: 'success', title: 'Registro Elimado', confirmButtonColor: '#8B1E28' });
+                }
+            });
+        }
+    </script>
+</body>
+</html>
