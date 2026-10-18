@@ -1,7 +1,7 @@
 <style>
-    /* Estilo para los botones inactivos (letras semi-transparentes) */
+    /* Estilo para los botones inactivos */
     #navPublicMenu .nav-link-item {
-        color: rgba(255, 255, 255, 0.55) !important;
+        color: rgba(255, 255, 255, 0.70) !important;
         font-weight: 500 !important;
         transition: all 0.2s ease-in-out;
         padding: 6px 12px !important;
@@ -9,59 +9,82 @@
         text-decoration: none !important;
     }
 
-    /* Efecto hover leve al pasar el cursor */
+    /* Efecto hover */
     #navPublicMenu .nav-link-item:hover {
         color: #ffffff !important;
-        background-color: rgba(255, 255, 255, 0.1) !important;
+        background-color: rgba(255, 255, 255, 0.15) !important;
     }
 
-    /* ESTADO ACTIVO PERMANENTE: Letras en blanco puro (#FFF) y negrita */
+    /* ESTADO ACTIVO PERMANENTE EN NAVBAR */
     #navPublicMenu .nav-link-item.activo-fijo {
         color: #ffffff !important;
         font-weight: 800 !important;
-        background-color: rgba(255, 255, 255, 0.2) !important;
+        background-color: rgba(255, 255, 255, 0.25) !important;
         box-shadow: inset 0 -3px 0 #ffffff !important;
+    }
+
+    /* Badge distintivo para la Delegación Activa según norma gráfica C3-C6 */
+    .badge-delegacion-activa {
+        background-color: #ffffff;
+        color: #8B1E28;
+        font-weight: 700;
+        border-radius: 6px;
+        padding: 6px 12px;
+        font-size: 0.85rem;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.15);
     }
 </style>
 
 <nav class="navbar navbar-expand-lg navbar-dark shadow-sm" style="background-color: #8B1E28;">
     <div class="container-fluid">
-        <a class="navbar-brand fw-bold me-3" href="dashboard.html">Muni La Serena</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+        <a class="navbar-brand fw-bold me-3" href="dashboard.html">
+            🏛️ Muni La Serena
+        </a>
+
+        <!-- DISTINTIVO CON TEXTO E ÍCONO DE LA DELEGACIÓN ACTIVA (REQUISITO PAUTA C3-C6) -->
+        <div class="badge-delegacion-activa d-none d-md-flex align-items-center gap-1 me-auto" id="badgeDelegacionHeader">
+            📍 <span id="usrHeaderDelegacion">DEL-001 | Sector Centro</span>
+        </div>
+
+        <button class="navbar-toggler ms-auto" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
             <span class="navbar-toggler-icon"></span>
         </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-            <!-- LISTA DE BOTONES NAVEGABLES -->
-            <ul class="navbar-nav me-auto flex-wrap gap-1" id="navPublicMenu">
-                <li class="nav-item">
-                    <a class="nav-link nav-link-item" href="delegaciones.html"> Delegaciones</a>
+
+        <div class="collapse navbar-collapse mt-2 mt-lg-0" id="navbarNav">
+            <!-- PESTAÑAS NAVEGABLES DEL SISTEMA -->
+            <ul class="navbar-nav ms-auto flex-wrap gap-1" id="navPublicMenu">
+                <li class="nav-item" id="nav-delegaciones">
+                    <a class="nav-link nav-link-item" href="delegaciones.html">Delegaciones</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link nav-link-item" href="roles.html"> Roles</a>
+                <li class="nav-item" id="nav-roles">
+                    <a class="nav-link nav-link-item" href="roles.html">Roles</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link nav-link-item" href="usuarios.html"> Usuarios</a>
+                <li class="nav-item" id="nav-usuarios">
+                    <a class="nav-link nav-link-item" href="usuarios.html">Usuarios</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link nav-link-item" href="items.html"> Ítems / Metas</a>
+                <li class="nav-item" id="nav-items">
+                    <a class="nav-link nav-link-item" href="items.html">Ítems / Metas</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link nav-link-item" href="tipos-atencion.html"> Tipo de Atención</a>
+                <li class="nav-item" id="nav-tipos">
+                    <a class="nav-link nav-link-item" href="tipos-atencion.html">Tipo de Atención</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link nav-link-item" href="sub-atenciones.html"> Sub Atención</a>
+                <li class="nav-item" id="nav-sub">
+                    <a class="nav-link nav-link-item" href="sub-atenciones.html">Sub Atención</a>
                 </li>
-                <li class="nav-item">
-                    <a class="nav-link nav-link-item" href="dashboard.html"> Gestión Territorial</a>
+                <li class="nav-item" id="nav-gestion">
+                    <a class="nav-link nav-link-item" href="dashboard.html">Gestión Territorial</a>
                 </li>
             </ul>
 
-            <div class="d-flex align-items-center text-white gap-3 ms-2">
+            <!-- IDENTIFICACIÓN DEL USUARIO, ROL Y SALIDA -->
+            <div class="d-flex align-items-center text-white gap-2 ms-lg-3 mt-2 mt-lg-0 border-top border-lg-0 pt-2 pt-lg-0">
                 <div class="text-end">
                     <small class="d-block fw-bold" id="usrHeaderNombre">Cargando...</small>
-                    <small class="badge bg-warning text-dark" id="usrHeaderRol">Rol</small>
+                    <span class="badge bg-warning text-dark" id="usrHeaderRol">Rol</span>
                 </div>
-                <button class="btn btn-outline-light btn-sm" onclick="cerrarSesion()">Cerrar Sesión</button>
+                <button class="btn btn-outline-light btn-sm ms-2" onclick="cerrarSesion()" title="Cerrar Sesión">
+                    Salir
+                </button>
             </div>
         </div>
     </div>

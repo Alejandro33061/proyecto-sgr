@@ -69,6 +69,10 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
+        const API = window.location.protocol.startsWith('http') 
+            ? `${window.location.origin}/api` 
+            : 'http://localhost:3000/api';
+
         let codigoGenerado = "";
         let usuarioOcorreoGlobal = "";
         let intentos = 0;
@@ -107,7 +111,7 @@
         async function solicitarCodigoServidor(correoOUsuario) {
             try {
                 usuarioOcorreoGlobal = correoOUsuario;
-                const res = await fetch('http://localhost:3000/api/recuperar-correo', {
+                const res = await fetch(`${API}/recuperar-correo`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ correo: correoOUsuario })
@@ -218,7 +222,7 @@
             }
 
             try {
-                const res = await fetch('http://localhost:3000/api/cambiar-password', {
+                const res = await fetch(`${API}/cambiar-password`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ correo: usuarioOcorreoGlobal, nuevaClave: pass })

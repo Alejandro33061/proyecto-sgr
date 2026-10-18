@@ -66,7 +66,11 @@ cd proyecto-sgr
 npm install
 node server.js
 
-4. URL de Producción en AWS: http://<IP_PUBLICA_AWS>:3000
+
+4. URL de Producción en AWS: 
+   http://3.226.143.33:3000/
+
+   php: http://3.226.143.33:8080/
 
 ---
 

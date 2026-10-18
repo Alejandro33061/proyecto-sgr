@@ -80,7 +80,7 @@
                 .then(html => {
                     document.getElementById('navbar-container').innerHTML = html;
                     marcarBotonActivo();
-                    cargarSesion();
+                    sincronizarSesionYNavbar();
                 });
 
             cargarUsuariosBD();
@@ -101,17 +101,71 @@
             });
         }
 
-        function cargarSesion() {
-            const sessionUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user'));
-            if (sessionUser) {
-                if (document.getElementById('usrHeaderNombre')) document.getElementById('usrHeaderNombre').textContent = sessionUser.nombre;
-                if (document.getElementById('usrHeaderRol')) document.getElementById('usrHeaderRol').textContent = sessionUser.rol;
+        async function sincronizarSesionYNavbar() {
+            try {
+                // Consultar el rol en tiempo real desde MySQL
+                const response = await fetch(`${API}/sesion-actual?t=${new Date().getTime()}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+
+                if (!response.ok) {
+                    window.location.href = 'index.html';
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data.success && data.usuario) {
+                    const usr = data.usuario;
+
+                    // Actualizar localStorage para mantener consistencia general
+                    localStorage.setItem('sgr_user', JSON.stringify(usr));
+
+                    // Actualizar el header del navbar con el rol REAL de MySQL
+                    const elNombre = document.getElementById('usrHeaderNombre');
+                    const elRol = document.getElementById('usrHeaderRol');
+                    if (elNombre) elNombre.textContent = usr.nombre || usr.nombre_usuario;
+                    if (elRol) elRol.textContent = usr.rol;
+
+                    // Evaluar permisos de acceso por rol
+                    const rolLower = (usr.rol || '').trim().toLowerCase();
+                    const esAdmin = rolLower.includes('admin') || rolLower.includes('coordinador');
+
+                    const modulosPrivados = ['nav-delegaciones', 'nav-roles', 'nav-usuarios', 'nav-items'];
+                    const paginasProhibidas = ['usuarios.html', 'roles.html', 'delegaciones.html', 'items.html'];
+                    const paginaActual = window.location.pathname.split("/").pop();
+
+                    if (!esAdmin) {
+                        // 1. Ocultar pestañas administrativas
+                        modulosPrivados.forEach(id => {
+                            const item = document.getElementById(id);
+                            if (item) item.style.display = 'none';
+                        });
+
+                        // 2. Redirigir a dashboard.html si intenta ver una vista restringida
+                        if (paginasProhibidas.some(p => paginaActual.includes(p))) {
+                            window.location.href = 'dashboard.html';
+                        }
+                    } else {
+                        // Mostrar todas las pestañas si es Administrador o Coordinador
+                        modulosPrivados.forEach(id => {
+                            const item = document.getElementById(id);
+                            if (item) item.style.display = 'block';
+                        });
+                    }
+                } else {
+                    window.location.href = 'index.html';
+                }
+            } catch (error) {
+                console.error('Error al sincronizar sesión:', error);
             }
         }
 
         async function cargarUsuariosBD() {
             try {
-                const response = await fetch(`${API}/usuarios`);
+                const response = await fetch(`${API}/usuarios`, { credentials: 'include' });
                 const json = await response.json();
                 if (json.success) {
                     listaUsuarios = json.usuarios.sort((a, b) => a.id_usuario - b.id_usuario);
@@ -238,6 +292,7 @@
                     const res = await fetch(`${API}/usuarios`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
                     const json = await res.json();
@@ -326,10 +381,12 @@
                     await fetch(`${API}/usuarios/${id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
                     Swal.fire('¡Actualizado!', 'Usuario modificado.', 'success');
                     cargarUsuariosBD();
+                    sincronizarSesionYNavbar();
                 }
             });
         }
@@ -344,7 +401,7 @@
                 confirmButtonText: 'Eliminar'
             }).then(async (res) => {
                 if (res.isConfirmed) {
-                    await fetch(`${API}/usuarios/${id}`, { method: 'DELETE' });
+                    await fetch(`${API}/usuarios/${id}`, { method: 'DELETE', credentials: 'include' });
                     cargarUsuariosBD();
                 }
             });
@@ -363,7 +420,12 @@
             a.click();
         }
 
-        function cerrarSesion() {
+        async function cerrarSesion() {
+            try {
+                await fetch(`${API}/logout`, { method: 'POST', credentials: 'include' });
+            } catch (e) {
+                console.error(e);
+            }
             localStorage.removeItem('sgr_user');
             sessionStorage.removeItem('sgr_user');
             window.location.href = 'index.html';

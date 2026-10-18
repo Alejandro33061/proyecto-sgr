@@ -66,6 +66,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="navbar.js"></script>
     <script>
         const API = window.location.protocol.startsWith('http') 
             ? `${window.location.origin}/api` 
@@ -75,44 +76,13 @@
         let listaTiposPadre = [];
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetch('navbar.html')
-                .then(res => res.text())
-                .then(html => {
-                    document.getElementById('navbar-container').innerHTML = html;
-                    marcarBotonActivo();
-                    cargarSesion();
-                });
-
             cargarTiposPadre();
             cargarSubAtencionesBD();
         });
 
-        function marcarBotonActivo() {
-            let paginaActual = window.location.pathname.split("/").pop();
-            if (!paginaActual || paginaActual === '') paginaActual = 'sub-atenciones.html';
-
-            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
-            enlaces.forEach(enlace => {
-                const href = enlace.getAttribute('href');
-                if (href === paginaActual) {
-                    enlace.classList.add('activo-fijo');
-                } else {
-                    enlace.classList.remove('activo-fijo');
-                }
-            });
-        }
-
-        function cargarSesion() {
-            const sessionUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user'));
-            if (sessionUser) {
-                if (document.getElementById('usrHeaderNombre')) document.getElementById('usrHeaderNombre').textContent = sessionUser.nombre;
-                if (document.getElementById('usrHeaderRol')) document.getElementById('usrHeaderRol').textContent = sessionUser.rol;
-            }
-        }
-
         async function cargarTiposPadre() {
             try {
-                const res = await fetch(`${API}/tipos-atencion`);
+                const res = await fetch(`${API}/tipos-atencion`, { credentials: 'include' });
                 const json = await res.json();
                 if (json.success) listaTiposPadre = json.datos;
             } catch (e) { console.error(e); }
@@ -120,7 +90,7 @@
 
         async function cargarSubAtencionesBD() {
             try {
-                const response = await fetch(`${API}/sub-atenciones`);
+                const response = await fetch(`${API}/sub-atenciones`, { credentials: 'include' });
                 const json = await response.json();
                 if (json.success) {
                     listaSubAtenciones = json.datos.sort((a, b) => (a.id_sub || a.id_sub_atencion) - (b.id_sub || b.id_sub_atencion));
@@ -220,6 +190,7 @@
                     await fetch(`${API}/sub-atenciones`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
                     Swal.fire('¡Guardado!', 'Sub Atención agregada.', 'success');
@@ -286,6 +257,7 @@
                     const res = await fetch(`${API}/sub-atenciones/${id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
                     const json = await res.json();
@@ -309,7 +281,7 @@
                 confirmButtonText: 'Eliminar'
             }).then(async (res) => {
                 if (res.isConfirmed) {
-                    const response = await fetch(`${API}/sub-atenciones/${id}`, { method: 'DELETE' });
+                    const response = await fetch(`${API}/sub-atenciones/${id}`, { method: 'DELETE', credentials: 'include' });
                     const json = await response.json();
                     if (json.success) {
                         Swal.fire('¡Eliminado!', 'Sub atención removida.', 'success');
@@ -332,12 +304,6 @@
             a.href = url;
             a.download = 'Sub_Atenciones.csv';
             a.click();
-        }
-
-        function cerrarSesion() {
-            localStorage.removeItem('sgr_user');
-            sessionStorage.removeItem('sgr_user');
-            window.location.href = 'index.html';
         }
     </script>
 </body>

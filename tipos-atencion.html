@@ -66,6 +66,7 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="navbar.js"></script>
     <script>
         const API = window.location.protocol.startsWith('http') 
             ? `${window.location.origin}/api` 
@@ -74,43 +75,12 @@
         let listaTipos = [];
 
         document.addEventListener('DOMContentLoaded', () => {
-            fetch('navbar.html')
-                .then(res => res.text())
-                .then(html => {
-                    document.getElementById('navbar-container').innerHTML = html;
-                    marcarBotonActivo();
-                    cargarSesion();
-                });
-
             cargarTiposBD();
         });
 
-        function marcarBotonActivo() {
-            let paginaActual = window.location.pathname.split("/").pop();
-            if (!paginaActual || paginaActual === '') paginaActual = 'tipos-atencion.html';
-
-            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
-            enlaces.forEach(enlace => {
-                const href = enlace.getAttribute('href');
-                if (href === paginaActual) {
-                    enlace.classList.add('activo-fijo');
-                } else {
-                    enlace.classList.remove('activo-fijo');
-                }
-            });
-        }
-
-        function cargarSesion() {
-            const sessionUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user'));
-            if (sessionUser) {
-                if (document.getElementById('usrHeaderNombre')) document.getElementById('usrHeaderNombre').textContent = sessionUser.nombre;
-                if (document.getElementById('usrHeaderRol')) document.getElementById('usrHeaderRol').textContent = sessionUser.rol;
-            }
-        }
-
         async function cargarTiposBD() {
             try {
-                const response = await fetch(`${API}/tipos-atencion`);
+                const response = await fetch(`${API}/tipos-atencion`, { credentials: 'include' });
                 const json = await response.json();
                 if (json.success) {
                     listaTipos = json.datos.sort((a, b) => (a.id_tipo || a.id_tipo_atencion) - (b.id_tipo || b.id_tipo_atencion));
@@ -206,6 +176,7 @@
                     await fetch(`${API}/tipos-atencion`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
                     Swal.fire('¡Guardado!', 'Tipo de atención agregado.', 'success');
@@ -265,6 +236,7 @@
                     const res = await fetch(`${API}/tipos-atencion/${id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
                     const json = await res.json();
@@ -288,7 +260,7 @@
                 confirmButtonText: 'Eliminar'
             }).then(async (res) => {
                 if (res.isConfirmed) {
-                    const response = await fetch(`${API}/tipos-atencion/${id}`, { method: 'DELETE' });
+                    const response = await fetch(`${API}/tipos-atencion/${id}`, { method: 'DELETE', credentials: 'include' });
                     const json = await response.json();
                     if (json.success) {
                         Swal.fire('¡Eliminado!', 'Registro removido.', 'success');
@@ -311,12 +283,6 @@
             a.href = url;
             a.download = 'Tipos_Atencion.csv';
             a.click();
-        }
-
-        function cerrarSesion() {
-            localStorage.removeItem('sgr_user');
-            sessionStorage.removeItem('sgr_user');
-            window.location.href = 'index.html';
         }
     </script>
 </body>
