@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Reportes - Muni La Serena</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-muni shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="dashboard.html">Muni La Serena</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menuPrincipal">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="menuPrincipal">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link text-white" href="dashboard.html">📊 Gestión Territorial</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="actividad.html">📝 Registrar Requerimiento</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="validar.html">📸 Validar Evidencias</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="reportes.html">📥 Reportes</a></li>
+                </ul>
+                <div class="d-flex"><a href="index.html" class="btn btn-outline-light btn-sm">Cerrar Sesión</a></div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-5" style="max-width: 600px;">
+        <div class="card glass-card p-5 shadow-sm text-center">
+            <h3 style="color: #8B1E28;" class="mb-4">Reportes de Alcaldía</h3>
+            
+            <form id="repForm" class="needs-validation" novalidate>
+                <div class="mb-4 text-start">
+                    <label class="fw-bold mb-2">Filtrar por Delegación Municipal:</label>
+                    <select class="form-select" required>
+                        <option value="" selected disabled>Seleccione...</option>
+                        <option>Consolidado Comunal (Todas)</option>
+                        <option>Avenida del Mar</option>
+                        <option>Centro</option>
+                        <option>La Antena</option>
+                        <option>Las Compañías</option>
+                        <option>La Pampa</option>
+                        <option>Rural</option>
+                    </select>
+                    <div class="invalid-feedback">Seleccione una opción para generar el documento.</div>
+                </div>
+                <button type="submit" class="btn btn-muni btn-lg w-100">📥 Exportar Estadísticas (Excel)</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const formRep = document.getElementById('repForm');
+        formRep.addEventListener('submit', function(e) {
+            if (!formRep.checkValidity()) {
+                e.preventDefault();
+                e.stopPropagation();
+            } else {
+                e.preventDefault();
+                alert('Descargando reporte territorial consolidado...');
+                window.location.href = 'dashboard.html';
+            }
+            formRep.classList.add('was-validated');
+        });
+    </script>
+</body>
+</html>

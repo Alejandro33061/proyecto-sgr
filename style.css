@@ -1,0 +1,28 @@
+/* style.css - Diseño Ilustre Municipalidad de La Serena */
+body {
+    background-color: #f0f2f5;
+    background-image: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+.glass-card {
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 32px 0 rgba(139, 30, 40, 0.15);
+    border-radius: 12px;
+}
+.bg-muni {
+    background-color: #8B1E28 !important; /* Rojo Institucional La Serena */
+}
+.btn-muni {
+    background-color: #8B1E28;
+    color: white;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+.btn-muni:hover {
+    background-color: #6b151e;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+}

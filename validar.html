@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Validar - Muni La Serena</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-muni shadow-sm">
+        <div class="container-fluid">
+            <a class="navbar-brand fw-bold" href="dashboard.html">Muni La Serena</a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menuPrincipal">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="menuPrincipal">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item"><a class="nav-link text-white" href="dashboard.html">📊 Gestión Territorial</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="actividad.html">📝 Registrar Requerimiento</a></li>
+                    <li class="nav-item"><a class="nav-link active" href="validar.html">📸 Validar Evidencias</a></li>
+                    <li class="nav-item"><a class="nav-link text-white" href="reportes.html">📥 Reportes</a></li>
+                </ul>
+                <div class="d-flex"><a href="index.html" class="btn btn-outline-light btn-sm">Cerrar Sesión</a></div>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4" style="max-width: 700px;">
+        <div class="card glass-card p-4 shadow-sm">
+            <h4 style="color: #8B1E28;">Validar Gestión Territorial</h4>
+            <hr>
+            <p><strong>Delegación:</strong> La Pampa</p>
+            <p><strong>Encargada:</strong> María Soledad Rojas</p>
+            <p><strong>Situación:</strong> Requerimiento de aseo y servicios comunitarios.</p>
+            
+            <div class="text-center my-4 p-5" style="border: 2px dashed #8B1E28; background: rgba(139, 30, 40, 0.05); border-radius: 8px;">
+                <span class="text-muted">📷 Fotografía de terreno adjunta</span>
+            </div>
+            
+            <div class="d-flex justify-content-end gap-3 mt-4">
+                <button class="btn btn-outline-danger" onclick="alert('Gestión rechazada'); window.location.href='dashboard.html';">Rechazar Evidencia</button>
+                <button class="btn btn-success" onclick="alert('Gestión aprobada. Se notifica a la Delegación.'); window.location.href='dashboard.html';">✔ Aprobar Solución</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>
