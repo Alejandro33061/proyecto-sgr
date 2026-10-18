@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Usuarios del Sistema - Muni La Serena</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body class="min-vh-100" style="background-color: #f4f6f9;">
+
+    <!-- NAVBAR CENTRALIZADO -->
+    <div id="navbar-container"></div>
+
+    <div class="container mt-4 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h3 style="color: #8B1E28;" class="m-0 fw-bold"> Usuarios del Sistema</h3>
+                <p class="text-muted m-0">Gestión de cuentas y asignación de delegaciones territoriales.</p>
+            </div>
+        </div>
+
+        <div class="card p-3 shadow-sm border-0">
+            <div class="row g-2 align-items-center mb-3">
+                <div class="col-md-5">
+                    <input type="text" id="busquedaUsuario" class="form-control" placeholder="Buscar por nombre, correo o rol..." oninput="filtrarUsuarios()">
+                </div>
+                <div class="col-md-3">
+                    <select id="filtroEstadoUsuario" class="form-select" onchange="filtrarUsuarios()">
+                        <option value="">Todos los estados</option>
+                        <option value="ACTIVO">ACTIVO</option>
+                        <option value="INACTIVO">INACTIVO</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-success w-100" onclick="exportarExcelUsuarios()">
+                        Exportar Excel
+                    </button>
+                </div>
+                <div class="col-md-2 text-end">
+                    <button class="btn text-white w-100" style="background-color: #8B1E28;" onclick="modalNuevoUsuario()">
+                        + Nuevo registro
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Nombre</th>
+                            <th>Correo</th>
+                            <th>Rol</th>
+                            <th>Delegación</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyUsuarios">
+                        <tr><td colspan="6" class="text-center">Cargando usuarios desde MySQL...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        const API = window.location.protocol.startsWith('http') 
+            ? `${window.location.origin}/api` 
+            : 'http://localhost:3000/api';
+
+        let listaUsuarios = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('navbar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('navbar-container').innerHTML = html;
+                    marcarBotonActivo();
+                    cargarSesion();
+                });
+
+            cargarUsuariosBD();
+        });
+
+        function marcarBotonActivo() {
+            let paginaActual = window.location.pathname.split("/").pop();
+            if (!paginaActual || paginaActual === '') paginaActual = 'usuarios.html';
+
+            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
+            enlaces.forEach(enlace => {
+                const href = enlace.getAttribute('href');
+                if (href === paginaActual) {
+                    enlace.classList.add('activo-fijo');
+                } else {
+                    enlace.classList.remove('activo-fijo');
+                }
+            });
+        }
+
+        function cargarSesion() {
+            const sessionUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user'));
+            if (sessionUser) {
+                if (document.getElementById('usrHeaderNombre')) document.getElementById('usrHeaderNombre').textContent = sessionUser.nombre;
+                if (document.getElementById('usrHeaderRol')) document.getElementById('usrHeaderRol').textContent = sessionUser.rol;
+            }
+        }
+
+        async function cargarUsuariosBD() {
+            try {
+                const response = await fetch(`${API}/usuarios`);
+                const json = await response.json();
+                if (json.success) {
+                    listaUsuarios = json.usuarios.sort((a, b) => a.id_usuario - b.id_usuario);
+                    renderTablaUsuarios(listaUsuarios);
+                }
+            } catch (error) { console.error(error); }
+        }
+
+        function renderTablaUsuarios(datos) {
+            const tbody = document.getElementById('tbodyUsuarios');
+            tbody.innerHTML = '';
+
+            if (!datos || datos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No hay usuarios registrados.</td></tr>';
+                return;
+            }
+
+            datos.forEach(u => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${u.nombre}</strong><br><small class="text-muted">@${u.nombre_usuario}</small></td>
+                    <td>${u.correo}</td>
+                    <td><span class="badge bg-primary">${u.rol}</span></td>
+                    <td>${u.delegacion || 'Sector Centro'}</td>
+                    <td><span class="badge ${u.estado === 'ACTIVO' ? 'bg-success' : 'bg-secondary'}">${u.estado || 'ACTIVO'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="modalEditarUsuario(${u.id_usuario})">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarUsuario(${u.id_usuario})">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filtrarUsuarios() {
+            const texto = document.getElementById('busquedaUsuario').value.toLowerCase();
+            const estado = document.getElementById('filtroEstadoUsuario').value;
+
+            const filtrados = listaUsuarios.filter(u => {
+                const coincideTexto = u.nombre.toLowerCase().includes(texto) || u.correo.toLowerCase().includes(texto) || u.rol.toLowerCase().includes(texto);
+                const coincideEstado = estado === '' || (u.estado || 'ACTIVO') === estado;
+                return coincideTexto && coincideEstado;
+            });
+
+            renderTablaUsuarios(filtrados);
+        }
+
+        function modalNuevoUsuario() {
+            Swal.fire({
+                title: 'Nuevo Usuario del Sistema',
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Nombre Completo *</label>
+                                <input id="sw-usr-nombre" class="form-control" placeholder="Ej: Ana Pérez">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Nombre Usuario (Login) *</label>
+                                <input id="sw-usr-nick" class="form-control" placeholder="Ej: ana.perez">
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Correo Electrónico *</label>
+                                <input id="sw-usr-correo" type="email" class="form-control" placeholder="ana@laserena.cl">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Contraseña *</label>
+                                <input id="sw-usr-clave" type="password" class="form-control" placeholder="******">
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Rol *</label>
+                                <select id="sw-usr-rol" class="form-select">
+                                    <option value="Administrador">Administrador</option>
+                                    <option value="Delegado Territorial">Delegado Territorial</option>
+                                    <option value="Operador">Operador</option>
+                                    <option value="Consultor">Consultor</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Delegación Asignada *</label>
+                                <select id="sw-usr-del" class="form-select">
+                                    <option value="Sector Centro">Sector Centro</option>
+                                    <option value="Las Compañías">Las Compañías</option>
+                                    <option value="La Pampa">La Pampa</option>
+                                    <option value="La Antena / La Florida">La Antena / La Florida</option>
+                                    <option value="Avenida del Mar">Avenida del Mar</option>
+                                    <option value="Rural">Rural</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `,
+                width: '600px',
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Guardar Usuario',
+                preConfirm: () => {
+                    const nombre = document.getElementById('sw-usr-nombre').value.trim();
+                    const nick = document.getElementById('sw-usr-nick').value.trim();
+                    const correo = document.getElementById('sw-usr-correo').value.trim();
+                    const clave = document.getElementById('sw-usr-clave').value.trim();
+
+                    if (!nombre || !nick || !correo || !clave) {
+                        Swal.showValidationMessage('Todos los campos son obligatorios.');
+                        return false;
+                    }
+                    return {
+                        rut: '12345678-9',
+                        nombre_usuario: nick,
+                        nombre: nombre,
+                        correo: correo,
+                        clave: clave,
+                        rol: document.getElementById('sw-usr-rol').value,
+                        delegacion: document.getElementById('sw-usr-del').value,
+                        estado: 'ACTIVO'
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const res = await fetch(`${API}/usuarios`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result.value)
+                    });
+                    const json = await res.json();
+                    if (json.success) {
+                        Swal.fire('¡Creado!', 'Usuario guardado en MySQL.', 'success');
+                        cargarUsuariosBD();
+                    } else {
+                        Swal.fire('Error', json.message, 'error');
+                    }
+                }
+            });
+        }
+
+        function modalEditarUsuario(id) {
+            const u = listaUsuarios.find(item => item.id_usuario === id);
+            if (!u) return;
+
+            Swal.fire({
+                title: `Editar Usuario #${id}`,
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Nombre Completo *</label>
+                                <input id="sw-edit-usr-nombre" class="form-control" value="${u.nombre}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Nombre Usuario *</label>
+                                <input id="sw-edit-usr-nick" class="form-control" value="${u.nombre_usuario}">
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Correo *</label>
+                                <input id="sw-edit-usr-correo" class="form-control" value="${u.correo}">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Rol *</label>
+                                <select id="sw-edit-usr-rol" class="form-select">
+                                    <option value="Administrador" ${u.rol === 'Administrador' ? 'selected' : ''}>Administrador</option>
+                                    <option value="Delegado Territorial" ${u.rol === 'Delegado Territorial' ? 'selected' : ''}>Delegado Territorial</option>
+                                    <option value="Operador" ${u.rol === 'Operador' ? 'selected' : ''}>Operador</option>
+                                    <option value="Consultor" ${u.rol === 'Consultor' ? 'selected' : ''}>Consultor</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Delegación *</label>
+                                <select id="sw-edit-usr-del" class="form-select">
+                                    <option value="Sector Centro" ${u.delegacion === 'Sector Centro' ? 'selected' : ''}>Sector Centro</option>
+                                    <option value="Las Compañías" ${u.delegacion === 'Las Compañías' ? 'selected' : ''}>Las Compañías</option>
+                                    <option value="La Pampa" ${u.delegacion === 'La Pampa' ? 'selected' : ''}>La Pampa</option>
+                                    <option value="La Antena / La Florida" ${u.delegacion === 'La Antena / La Florida' ? 'selected' : ''}>La Antena / La Florida</option>
+                                    <option value="Avenida del Mar" ${u.delegacion === 'Avenida del Mar' ? 'selected' : ''}>Avenida del Mar</option>
+                                    <option value="Rural" ${u.delegacion === 'Rural' ? 'selected' : ''}>Rural</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Estado</label>
+                                <select id="sw-edit-usr-est" class="form-select">
+                                    <option value="ACTIVO" ${u.estado === 'ACTIVO' ? 'selected' : ''}>ACTIVO</option>
+                                    <option value="INACTIVO" ${u.estado === 'INACTIVO' ? 'selected' : ''}>INACTIVO</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                `,
+                width: '600px',
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Actualizar',
+                preConfirm: () => {
+                    return {
+                        rut: u.rut || '12345678-9',
+                        nombre_usuario: document.getElementById('sw-edit-usr-nick').value.trim(),
+                        nombre: document.getElementById('sw-edit-usr-nombre').value.trim(),
+                        correo: document.getElementById('sw-edit-usr-correo').value.trim(),
+                        rol: document.getElementById('sw-edit-usr-rol').value,
+                        delegacion: document.getElementById('sw-edit-usr-del').value,
+                        estado: document.getElementById('sw-edit-usr-est').value
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    await fetch(`${API}/usuarios/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result.value)
+                    });
+                    Swal.fire('¡Actualizado!', 'Usuario modificado.', 'success');
+                    cargarUsuariosBD();
+                }
+            });
+        }
+
+        async function eliminarUsuario(id) {
+            Swal.fire({
+                title: '¿Eliminar usuario?',
+                text: 'Se borra de MySQL permanentemente.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Eliminar'
+            }).then(async (res) => {
+                if (res.isConfirmed) {
+                    await fetch(`${API}/usuarios/${id}`, { method: 'DELETE' });
+                    cargarUsuariosBD();
+                }
+            });
+        }
+
+        function exportarExcelUsuarios() {
+            let csv = 'Nombre,Correo,Rol,Delegacion,Estado\n';
+            listaUsuarios.forEach(u => {
+                csv += `"${u.nombre}","${u.correo}","${u.rol}","${u.delegacion}","${u.estado || 'ACTIVO'}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Usuarios_Sistema.csv';
+            a.click();
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('sgr_user');
+            sessionStorage.removeItem('sgr_user');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

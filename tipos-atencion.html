@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tipos de Atención - Muni La Serena</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body class="min-vh-100" style="background-color: #f4f6f9;">
+
+    <!-- NAVBAR CENTRALIZADO -->
+    <div id="navbar-container"></div>
+
+    <div class="container mt-4 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h3 style="color: #8B1E28;" class="m-0 fw-bold">Tipos de Atención</h3>
+                <p class="text-muted m-0">Catálogo general de categorías de atención municipal.</p>
+            </div>
+        </div>
+
+        <div class="card p-3 shadow-sm border-0">
+            <div class="row g-2 align-items-center mb-3">
+                <div class="col-md-5">
+                    <input type="text" id="busquedaTipo" class="form-control" placeholder="Buscar por nombre, código u otro campo..." oninput="filtrarTipos()">
+                </div>
+                <div class="col-md-3">
+                    <select id="filtroEstadoTipo" class="form-select" onchange="filtrarTipos()">
+                        <option value="">Todos los estados</option>
+                        <option value="ACTIVO">ACTIVO</option>
+                        <option value="INACTIVO">INACTIVO</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-success w-100" onclick="exportarExcelTipos()">
+                        Exportar Excel
+                    </button>
+                </div>
+                <div class="col-md-2 text-end">
+                    <button class="btn text-white w-100" style="background-color: #8B1E28;" onclick="modalNuevoTipo()">
+                        + Nuevo registro
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Código</th>
+                            <th>Nombre</th>
+                            <th>Descripción</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyTipos">
+                        <tr><td colspan="5" class="text-center">Cargando tipos de atención...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        const API = window.location.protocol.startsWith('http') 
+            ? `${window.location.origin}/api` 
+            : 'http://localhost:3000/api';
+
+        let listaTipos = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('navbar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('navbar-container').innerHTML = html;
+                    marcarBotonActivo();
+                    cargarSesion();
+                });
+
+            cargarTiposBD();
+        });
+
+        function marcarBotonActivo() {
+            let paginaActual = window.location.pathname.split("/").pop();
+            if (!paginaActual || paginaActual === '') paginaActual = 'tipos-atencion.html';
+
+            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
+            enlaces.forEach(enlace => {
+                const href = enlace.getAttribute('href');
+                if (href === paginaActual) {
+                    enlace.classList.add('activo-fijo');
+                } else {
+                    enlace.classList.remove('activo-fijo');
+                }
+            });
+        }
+
+        function cargarSesion() {
+            const sessionUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user'));
+            if (sessionUser) {
+                if (document.getElementById('usrHeaderNombre')) document.getElementById('usrHeaderNombre').textContent = sessionUser.nombre;
+                if (document.getElementById('usrHeaderRol')) document.getElementById('usrHeaderRol').textContent = sessionUser.rol;
+            }
+        }
+
+        async function cargarTiposBD() {
+            try {
+                const response = await fetch(`${API}/tipos-atencion`);
+                const json = await response.json();
+                if (json.success) {
+                    listaTipos = json.datos.sort((a, b) => (a.id_tipo || a.id_tipo_atencion) - (b.id_tipo || b.id_tipo_atencion));
+                    renderTablaTipos(listaTipos);
+                }
+            } catch (error) { console.error(error); }
+        }
+
+        function renderTablaTipos(datos) {
+            const tbody = document.getElementById('tbodyTipos');
+            tbody.innerHTML = '';
+
+            if (!datos || datos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No hay tipos registrados.</td></tr>';
+                return;
+            }
+
+            datos.forEach(t => {
+                const idReal = t.id_tipo || t.id_tipo_atencion;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${t.codigo}</strong></td>
+                    <td>${t.nombre}</td>
+                    <td>${t.descripcion || 'Sin descripción'}</td>
+                    <td><span class="badge ${t.estado === 'ACTIVO' ? 'bg-success' : 'bg-secondary'}">${t.estado}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="modalEditarTipo(${idReal})">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarTipo(${idReal})">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filtrarTipos() {
+            const texto = document.getElementById('busquedaTipo').value.toLowerCase();
+            const estado = document.getElementById('filtroEstadoTipo').value;
+
+            const filtrados = listaTipos.filter(t => {
+                const coincideTexto = t.nombre.toLowerCase().includes(texto) || t.codigo.toLowerCase().includes(texto);
+                const coincideEstado = estado === '' || t.estado === estado;
+                return coincideTexto && coincideEstado;
+            });
+
+            renderTablaTipos(filtrados);
+        }
+
+        function modalNuevoTipo() {
+            Swal.fire({
+                title: 'Nuevo Tipo de Atención',
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Código *</label>
+                            <input id="sw-ta-codigo" class="form-control" placeholder="Ej: TA001">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Nombre *</label>
+                            <input id="sw-ta-nombre" class="form-control" placeholder="Ej: Social, Salud, Educación">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Descripción</label>
+                            <input id="sw-ta-desc" class="form-control" placeholder="Descripción breve">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Estado</label>
+                            <select id="sw-ta-est" class="form-select">
+                                <option value="ACTIVO">ACTIVO</option>
+                                <option value="INACTIVO">INACTIVO</option>
+                            </select>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Guardar',
+                preConfirm: () => {
+                    const codigo = document.getElementById('sw-ta-codigo').value.trim();
+                    const nombre = document.getElementById('sw-ta-nombre').value.trim();
+                    if (!codigo || !nombre) {
+                        Swal.showValidationMessage('El Código y Nombre son obligatorios.');
+                        return false;
+                    }
+                    return {
+                        codigo,
+                        nombre,
+                        descripcion: document.getElementById('sw-ta-desc').value.trim() || 'Sin descripción',
+                        estado: document.getElementById('sw-ta-est').value
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    await fetch(`${API}/tipos-atencion`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result.value)
+                    });
+                    Swal.fire('¡Guardado!', 'Tipo de atención agregado.', 'success');
+                    cargarTiposBD();
+                }
+            });
+        }
+
+        function modalEditarTipo(id) {
+            const t = listaTipos.find(item => (item.id_tipo || item.id_tipo_atencion) === id);
+            if (!t) return;
+
+            Swal.fire({
+                title: `Editar Tipo de Atención`,
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Código *</label>
+                            <input id="sw-edit-ta-codigo" class="form-control" value="${t.codigo}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Nombre *</label>
+                            <input id="sw-edit-ta-nombre" class="form-control" value="${t.nombre}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Descripción</label>
+                            <input id="sw-edit-ta-desc" class="form-control" value="${t.descripcion || ''}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Estado</label>
+                            <select id="sw-edit-ta-est" class="form-select">
+                                <option value="ACTIVO" ${t.estado === 'ACTIVO' ? 'selected' : ''}>ACTIVO</option>
+                                <option value="INACTIVO" ${t.estado === 'INACTIVO' ? 'selected' : ''}>INACTIVO</option>
+                            </select>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Actualizar',
+                preConfirm: () => {
+                    const codigo = document.getElementById('sw-edit-ta-codigo').value.trim();
+                    const nombre = document.getElementById('sw-edit-ta-nombre').value.trim();
+                    if (!codigo || !nombre) {
+                        Swal.showValidationMessage('El Código y Nombre son obligatorios.');
+                        return false;
+                    }
+                    return {
+                        codigo,
+                        nombre,
+                        descripcion: document.getElementById('sw-edit-ta-desc').value.trim(),
+                        estado: document.getElementById('sw-edit-ta-est').value
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const res = await fetch(`${API}/tipos-atencion/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result.value)
+                    });
+                    const json = await res.json();
+                    if (json.success) {
+                        Swal.fire('¡Actualizado!', 'Tipo modificado correctamente.', 'success');
+                        cargarTiposBD();
+                    } else {
+                        Swal.fire('Error', json.message, 'error');
+                    }
+                }
+            });
+        }
+
+        async function eliminarTipo(id) {
+            Swal.fire({
+                title: '¿Eliminar Tipo de Atención?',
+                text: 'Se validará la integridad referencial antes de eliminar.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Eliminar'
+            }).then(async (res) => {
+                if (res.isConfirmed) {
+                    const response = await fetch(`${API}/tipos-atencion/${id}`, { method: 'DELETE' });
+                    const json = await response.json();
+                    if (json.success) {
+                        Swal.fire('¡Eliminado!', 'Registro removido.', 'success');
+                        cargarTiposBD();
+                    } else {
+                        Swal.fire('Operación Bloqueada', json.message, 'error');
+                    }
+                }
+            });
+        }
+
+        function exportarExcelTipos() {
+            let csv = 'Codigo,Nombre,Descripcion,Estado\n';
+            listaTipos.forEach(t => {
+                csv += `"${t.codigo}","${t.nombre}","${t.descripcion || ''}","${t.estado}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Tipos_Atencion.csv';
+            a.click();
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('sgr_user');
+            sessionStorage.removeItem('sgr_user');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

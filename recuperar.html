@@ -10,78 +10,234 @@
 </head>
 <body class="d-flex align-items-center justify-content-center" style="min-height: 100vh;">
 
-    <div class="card glass-card p-4" style="width: 100%; max-width: 440px;">
-        <div class="text-center mb-4">
+    <div class="card glass-card p-4" style="width: 100%; max-width: 480px;">
+        <div class="text-center mb-3">
             <h4 style="color: #8B1E28;" class="fw-bold">I. MUNICIPALIDAD DE LA SERENA</h4>
-            <h6 class="text-muted">Recuperación de Acceso Institucional</h6>
+            <h6 class="text-muted" id="flowTitle">Paso 1: Solicitud de Código</h6>
         </div>
-        
-        <form id="recoverForm" novalidate>
-            <div class="mb-3">
-                <label class="form-label fw-bold">RUT del Funcionario *</label>
-                <input type="text" class="form-control" id="rut" placeholder="12345678-9" required>
-                <div class="invalid-feedback">Ingrese un RUT válido con guion.</div>
-            </div>
-            
-            <div class="mb-4">
-                <label class="form-label fw-bold">Correo Institucional *</label>
-                <input type="email" class="form-control" id="email" placeholder="usuario@laserena.cl" required>
-                <div class="invalid-feedback">Ingrese un correo institucional válido.</div>
-            </div>
 
-            <button type="submit" class="btn btn-muni w-100 py-2 mb-3">Enviar Enlace de Recuperación</button>
-            <div class="text-center">
-                <a href="index.html" class="text-decoration-none small text-secondary">← Volver al Inicio de Sesión</a>
+        <!-- PASO 1: Solicitud por Usuario o Correo -->
+        <div id="step1">
+            <form id="formStep1" novalidate>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Usuario o Correo Institucional *</label>
+                    <input type="text" class="form-control" id="reqEmail" placeholder="usuario@laserena.cl" required>
+                    <div class="invalid-feedback">Ingrese un usuario o correo registrado.</div>
+                </div>
+                <button type="submit" class="btn btn-muni w-100 py-2 mb-3">Enviar Código por Correo</button>
+            </form>
+        </div>
+
+        <!-- PASO 2: Validar Código y Temporizador -->
+        <div id="step2" class="d-none">
+            <div class="alert alert-warning text-center py-2 mb-3" style="font-size: 0.9rem;">
+                ⏱️ Tiempo restante del código: <strong id="timerDisplay">03:00</strong>
             </div>
-        </form>
+            <form id="formStep2" novalidate>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Código de Verificación (6 dígitos) *</label>
+                    <input type="text" class="form-control text-center fs-4 fw-bold" id="inputCode" maxlength="6" placeholder="000000" required>
+                </div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <small class="text-muted">Intentos fallidos: <span id="intentosCount" class="badge bg-danger">0/3</span></small>
+                    <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 fw-bold" style="color:#8B1E28;" onclick="reenviarCodigo()">🔄 Reenviar Código</button>
+                </div>
+                <button type="submit" class="btn btn-muni w-100 py-2 mb-3" id="btnValidarCodigo">Comprobar Código</button>
+            </form>
+        </div>
+
+        <!-- PASO 3: Crear Nueva Contraseña -->
+        <div id="step3" class="d-none">
+            <form id="formStep3" novalidate>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Nueva Contraseña *</label>
+                    <input type="password" class="form-control" id="newPass" placeholder="Mínimo 8 caracteres" required>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label fw-bold">Confirmar Nueva Contraseña *</label>
+                    <input type="password" class="form-control" id="confirmPass" placeholder="Repita la nueva contraseña" required>
+                </div>
+                <button type="submit" class="btn btn-muni w-100 py-2 mb-3">Actualizar Contraseña</button>
+            </form>
+        </div>
+
+        <div class="text-center mt-2">
+            <a href="index.html" class="text-decoration-none small text-secondary">← Cancelar y Volver al Login</a>
+        </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
     <script>
-        function validaRut(rutCompleto) {
-            if (!/^[0-9]+-[0-9kK]{1}$/.test(rutCompleto)) return false;
-            let tmp = rutCompleto.split('-');
-            let digv = tmp[1].toLowerCase(); 
-            let rut = tmp[0];
-            if (digv == 'k') digv = 10;
-            let M = 0, S = 1;
-            for (; rut; rut = Math.floor(rut / 10))
-                S = (S + rut % 10 * (9 - M++ % 6)) % 11;
-            return true;
+        let codigoGenerado = "";
+        let usuarioOcorreoGlobal = "";
+        let intentos = 0;
+        let timerInterval = null;
+        let tiempoRestante = 180;
+
+        function iniciarTemporizador() {
+            clearInterval(timerInterval);
+            tiempoRestante = 180;
+            actualizarRelojUI();
+
+            timerInterval = setInterval(() => {
+                tiempoRestante--;
+                actualizarRelojUI();
+
+                if (tiempoRestante <= 0) {
+                    clearInterval(timerInterval);
+                    document.getElementById('inputCode').disabled = true;
+                    document.getElementById('btnValidarCodigo').disabled = true;
+                    Swal.fire({
+                        title: 'Código Expirado',
+                        text: 'El código ha caducado. Por favor solicite un nuevo código.',
+                        icon: 'warning',
+                        confirmButtonColor: '#8B1E28'
+                    });
+                }
+            }, 1000);
         }
 
-        document.getElementById('recoverForm').addEventListener('submit', function(event) {
-            event.preventDefault();
-            const rutInput = document.getElementById('rut');
-            const emailInput = document.getElementById('email');
-            let esValido = true;
+        function actualizarRelojUI() {
+            const min = Math.floor(tiempoRestante / 60);
+            const seg = tiempoRestante % 60;
+            document.getElementById('timerDisplay').textContent = `${min < 10 ? '0' + min : min}:${seg < 10 ? '0' + seg : seg}`;
+        }
 
-            if (!validaRut(rutInput.value)) {
-                rutInput.classList.add('is-invalid');
-                esValido = false;
-            } else {
-                rutInput.classList.remove('is-invalid');
-            }
-
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!emailRegex.test(emailInput.value)) {
-                emailInput.classList.add('is-invalid');
-                esValido = false;
-            } else {
-                emailInput.classList.remove('is-invalid');
-            }
-
-            if (esValido) {
-                Swal.fire({
-                    title: '¡Solicitud Enviada!',
-                    text: 'Se han enviado las instrucciones de restablecimiento al correo ingresado.',
-                    icon: 'success',
-                    confirmButtonColor: '#8B1E28',
-                    confirmButtonText: 'Entendido'
-                }).then(() => {
-                    window.location.href = 'index.html';
+        async function solicitarCodigoServidor(correoOUsuario) {
+            try {
+                usuarioOcorreoGlobal = correoOUsuario;
+                const res = await fetch('http://localhost:3000/api/recuperar-correo', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ correo: correoOUsuario })
                 });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    codigoGenerado = data.codigo;
+                    Swal.fire({
+                        title: '¡Código Generado!',
+                        html: `Se ha enviado el código a <b>${data.destino}</b>.<br><br><small class="text-muted">(Código activo para validación: <b>${data.codigo}</b>)</small>`,
+                        icon: 'success',
+                        confirmButtonColor: '#8B1E28'
+                    }).then(() => {
+                        document.getElementById('step1').classList.add('d-none');
+                        document.getElementById('step2').classList.remove('d-none');
+                        document.getElementById('flowTitle').textContent = 'Paso 2: Validar Código';
+                        document.getElementById('inputCode').disabled = false;
+                        document.getElementById('btnValidarCodigo').disabled = false;
+                        document.getElementById('inputCode').value = '';
+                        iniciarTemporizador();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'No encontrado',
+                        text: data.message,
+                        icon: 'error',
+                        confirmButtonColor: '#8B1E28'
+                    });
+                }
+            } catch (err) {
+                Swal.fire({
+                    title: 'Error de servidor',
+                    text: 'Asegúrese de ejecutar node server.js en la terminal.',
+                    icon: 'error',
+                    confirmButtonColor: '#8B1E28'
+                });
+            }
+        }
+
+        document.getElementById('formStep1').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const val = document.getElementById('reqEmail').value.trim();
+            if (val) solicitarCodigoServidor(val);
+        });
+
+        function reenviarCodigo() {
+            intentos = 0;
+            document.getElementById('intentosCount').textContent = '0/3';
+            solicitarCodigoServidor(usuarioOcorreoGlobal);
+        }
+
+        document.getElementById('formStep2').addEventListener('submit', function(e) {
+            e.preventDefault();
+            const inputVal = document.getElementById('inputCode').value.trim();
+
+            if (inputVal === codigoGenerado && tiempoRestante > 0) {
+                clearInterval(timerInterval);
+                Swal.fire({
+                    title: '¡Código Verificado!',
+                    text: 'Ingrese su nueva contraseña.',
+                    icon: 'success',
+                    confirmButtonColor: '#8B1E28'
+                }).then(() => {
+                    document.getElementById('step2').classList.add('d-none');
+                    document.getElementById('step3').classList.remove('d-none');
+                    document.getElementById('flowTitle').textContent = 'Paso 3: Nueva Contraseña';
+                });
+            } else {
+                intentos++;
+                document.getElementById('intentosCount').textContent = `${intentos}/3`;
+
+                if (intentos >= 3) {
+                    clearInterval(timerInterval);
+                    Swal.fire({
+                        title: 'Intentos Agotados',
+                        text: 'Ha superado los 3 intentos. Reenviando nuevo código...',
+                        icon: 'error',
+                        confirmButtonColor: '#8B1E28'
+                    }).then(() => {
+                        reenviarCodigo();
+                    });
+                } else {
+                    Swal.fire({
+                        title: 'Código Incorrecto',
+                        text: 'Verifique los 6 dígitos e intente de nuevo.',
+                        icon: 'error',
+                        confirmButtonColor: '#8B1E28'
+                    });
+                }
+            }
+        });
+
+        document.getElementById('formStep3').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const pass = document.getElementById('newPass').value;
+            const confirm = document.getElementById('confirmPass').value;
+
+            if (pass.length < 8 || pass !== confirm) {
+                Swal.fire({
+                    title: 'Contraseña inválida',
+                    text: 'Debe tener mínimo 8 caracteres y ambos campos deben coincidir.',
+                    icon: 'warning',
+                    confirmButtonColor: '#8B1E28'
+                });
+                return;
+            }
+
+            try {
+                const res = await fetch('http://localhost:3000/api/cambiar-password', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ correo: usuarioOcorreoGlobal, nuevaClave: pass })
+                });
+
+                const data = await res.json();
+
+                if (data.success) {
+                    Swal.fire({
+                        title: '¡Contraseña Actualizada!',
+                        text: 'La contraseña se ha modificado con éxito.',
+                        icon: 'success',
+                        confirmButtonColor: '#8B1E28'
+                    }).then(() => {
+                        window.location.href = 'index.html';
+                    });
+                }
+            } catch (err) {
+                Swal.fire({ title: 'Error', text: 'No se pudo actualizar la clave.', icon: 'error', confirmButtonColor: '#8B1E28' });
             }
         });
     </script>

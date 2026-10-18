@@ -1,0 +1,292 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mantenedor Roles - Muni La Serena</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body class="min-vh-100" style="background-color: #f4f6f9;">
+
+    <!-- NAVBAR CENTRALIZADO -->
+    <div id="navbar-container"></div>
+
+    <div class="container mt-4 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h3 style="color: #8B1E28;" class="m-0 fw-bold"> Roles y Permisos</h3>
+                <p class="text-muted m-0">Gestión de perfiles de acceso para usuarios del sistema.</p>
+            </div>
+        </div>
+
+        <div class="card p-3 shadow-sm border-0">
+            <div class="row g-2 align-items-center mb-3">
+                <div class="col-md-6">
+                    <input type="text" id="busquedaRol" class="form-control" placeholder="Buscar por nombre de rol..." oninput="filtrarRoles()">
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-outline-success w-100" onclick="exportarExcelRoles()">
+                        Exportar Excel
+                    </button>
+                </div>
+                <div class="col-md-3 text-end">
+                    <button class="btn text-white w-100" style="background-color: #8B1E28;" onclick="modalNuevoRol()">
+                        + Nuevo Rol
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ID</th>
+                            <th>Nombre del Rol</th>
+                            <th>Descripción</th>
+                            <th>Alcance</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyRoles">
+                        <tr><td colspan="5" class="text-center">Cargando roles desde MySQL...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        const API = window.location.protocol.startsWith('http') 
+            ? `${window.location.origin}/api` 
+            : 'http://localhost:3000/api';
+
+        let listaRoles = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('navbar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('navbar-container').innerHTML = html;
+                    marcarBotonActivo();
+                    cargarSesion();
+                });
+
+            cargarRolesBD();
+        });
+
+        function marcarBotonActivo() {
+            let paginaActual = window.location.pathname.split("/").pop();
+            if (!paginaActual || paginaActual === '') paginaActual = 'roles.html';
+
+            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
+            enlaces.forEach(enlace => {
+                const href = enlace.getAttribute('href');
+                if (href === paginaActual) {
+                    enlace.classList.add('activo-fijo');
+                } else {
+                    enlace.classList.remove('activo-fijo');
+                }
+            });
+        }
+
+        function cargarSesion() {
+            const sessionUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user'));
+            if (sessionUser) {
+                if (document.getElementById('usrHeaderNombre')) document.getElementById('usrHeaderNombre').textContent = sessionUser.nombre;
+                if (document.getElementById('usrHeaderRol')) document.getElementById('usrHeaderRol').textContent = sessionUser.rol;
+            }
+        }
+
+        async function cargarRolesBD() {
+            try {
+                const response = await fetch(`${API}/roles`);
+                const json = await response.json();
+                if (json.success) {
+                    listaRoles = json.datos.sort((a, b) => a.id_rol - b.id_rol);
+                    renderTablaRoles(listaRoles);
+                }
+            } catch (error) { console.error(error); }
+        }
+
+        function renderTablaRoles(datos) {
+            const tbody = document.getElementById('tbodyRoles');
+            tbody.innerHTML = '';
+
+            if (!datos || datos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No hay roles registrados.</td></tr>';
+                return;
+            }
+
+            datos.forEach(r => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td>#${r.id_rol}</td>
+                    <td><strong>${r.nombre}</strong></td>
+                    <td>${r.descripcion || 'Sin descripción'}</td>
+                    <td>${r.alcance || 'Comunal'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="modalEditarRol(${r.id_rol})">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarRol(${r.id_rol})">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filtrarRoles() {
+            const texto = document.getElementById('busquedaRol').value.toLowerCase();
+            renderTablaRoles(listaRoles.filter(r => r.nombre.toLowerCase().includes(texto)));
+        }
+
+        function modalNuevoRol() {
+            Swal.fire({
+                title: 'Nuevo Rol de Sistema',
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Nombre del Rol *</label>
+                            <input id="sw-rol-nombre" class="form-control" placeholder="Nombre del rol">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Descripción</label>
+                            <input id="sw-rol-desc" class="form-control" placeholder="Descripción de permisos">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Alcance</label>
+                            <input id="sw-rol-alcance" class="form-control" placeholder="Ej: Comunal o Delegación">
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Guardar Rol',
+                cancelButtonText: 'Cancelar',
+                preConfirm: () => {
+                    const nombre = document.getElementById('sw-rol-nombre').value.trim();
+                    if (!nombre) {
+                        Swal.showValidationMessage('Ingresa el Nombre del Rol.');
+                        return false;
+                    }
+                    return {
+                        nombre: nombre,
+                        descripcion: document.getElementById('sw-rol-desc').value.trim() || 'Sin descripción',
+                        permisos: 'Lectura/Escritura',
+                        alcance: document.getElementById('sw-rol-alcance').value.trim() || 'Comunal'
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    await fetch(`${API}/roles`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result.value)
+                    });
+                    Swal.fire('¡Guardado!', 'Rol registrado con éxito.', 'success');
+                    cargarRolesBD();
+                }
+            });
+        }
+
+        function modalEditarRol(id) {
+            const r = listaRoles.find(item => item.id_rol === id);
+            if (!r) return;
+
+            Swal.fire({
+                title: `Editar Rol #${id}`,
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Nombre del Rol *</label>
+                            <input id="sw-edit-rol-nombre" class="form-control" value="${r.nombre}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Descripción</label>
+                            <input id="sw-edit-rol-desc" class="form-control" value="${r.descripcion || ''}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Alcance</label>
+                            <input id="sw-edit-rol-alcance" class="form-control" value="${r.alcance || ''}">
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Actualizar',
+                cancelButtonText: 'Cancelar',
+                preConfirm: () => {
+                    const nombre = document.getElementById('sw-edit-rol-nombre').value.trim();
+                    if (!nombre) {
+                        Swal.showValidationMessage('Ingresa el Nombre del Rol.');
+                        return false;
+                    }
+                    return {
+                        nombre: nombre,
+                        descripcion: document.getElementById('sw-edit-rol-desc').value.trim() || 'Sin descripción',
+                        permisos: 'Lectura/Escritura',
+                        alcance: document.getElementById('sw-edit-rol-alcance').value.trim() || 'Comunal'
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    try {
+                        const response = await fetch(`${API}/roles/${id}`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(result.value)
+                        });
+                        const json = await response.json();
+                        if (json.success) {
+                            Swal.fire('¡Actualizado!', 'Rol modificado en MySQL.', 'success');
+                            cargarRolesBD();
+                        } else {
+                            Swal.fire('Error', json.message, 'error');
+                        }
+                    } catch (e) {
+                        Swal.fire('Error', 'No se pudo actualizar el rol.', 'error');
+                    }
+                }
+            });
+        }
+
+        async function eliminarRol(id) {
+            Swal.fire({
+                title: '¿Eliminar Rol?',
+                text: 'Se borra de la base de datos.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Eliminar',
+                cancelButtonText: 'Cancelar'
+            }).then(async (res) => {
+                if (res.isConfirmed) {
+                    await fetch(`${API}/roles/${id}`, { method: 'DELETE' });
+                    cargarRolesBD();
+                }
+            });
+        }
+
+        function exportarExcelRoles() {
+            let csv = 'ID,Nombre,Descripcion,Alcance\n';
+            listaRoles.forEach(r => {
+                csv += `"${r.id_rol}","${r.nombre}","${r.descripcion || ''}","${r.alcance || ''}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Roles_Sistema.csv';
+            a.click();
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('sgr_user');
+            sessionStorage.removeItem('sgr_user');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

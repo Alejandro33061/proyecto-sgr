@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ítems y Metas - Muni La Serena</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body class="min-vh-100" style="background-color: #f4f6f9;">
+
+    <!-- NAVBAR CENTRALIZADO -->
+    <div id="navbar-container"></div>
+
+    <div class="container mt-4 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h3 style="color: #8B1E28;" class="m-0 fw-bold"> Ítems y Metas Municipales</h3>
+                <p class="text-muted m-0">Gestión de objetivos de respuesta y metas institucionales.</p>
+            </div>
+        </div>
+
+        <div class="card p-3 shadow-sm border-0">
+            <div class="row g-2 align-items-center mb-3">
+                <div class="col-md-6">
+                    <input type="text" id="busquedaItem" class="form-control" placeholder="Buscar por código o nombre..." oninput="filtrarItems()">
+                </div>
+                <div class="col-md-3">
+                    <button class="btn btn-outline-success w-100" onclick="exportarExcelItems()">
+                        Exportar Excel
+                    </button>
+                </div>
+                <div class="col-md-3 text-end">
+                    <button class="btn text-white w-100" style="background-color: #8B1E28;" onclick="modalNuevoItem()">
+                        + Nuevo registro
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Código</th>
+                            <th>Nombre Meta</th>
+                            <th>Descripción</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodyItems">
+                        <tr><td colspan="5" class="text-center">Cargando ítems desde MySQL...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        const API = window.location.protocol.startsWith('http') 
+            ? `${window.location.origin}/api` 
+            : 'http://localhost:3000/api';
+
+        let listaItems = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('navbar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('navbar-container').innerHTML = html;
+                    marcarBotonActivo();
+                    cargarSesion();
+                });
+
+            cargarItemsBD();
+        });
+
+        function marcarBotonActivo() {
+            let paginaActual = window.location.pathname.split("/").pop();
+            if (!paginaActual || paginaActual === '') paginaActual = 'items.html';
+
+            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
+            enlaces.forEach(enlace => {
+                const href = enlace.getAttribute('href');
+                if (href === paginaActual) {
+                    enlace.classList.add('activo-fijo');
+                } else {
+                    enlace.classList.remove('activo-fijo');
+                }
+            });
+        }
+
+        function cargarSesion() {
+            const sessionUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user'));
+            if (sessionUser) {
+                if (document.getElementById('usrHeaderNombre')) document.getElementById('usrHeaderNombre').textContent = sessionUser.nombre;
+                if (document.getElementById('usrHeaderRol')) document.getElementById('usrHeaderRol').textContent = sessionUser.rol;
+            }
+        }
+
+        async function cargarItemsBD() {
+            try {
+                const response = await fetch(`${API}/items`);
+                const json = await response.json();
+                if (json.success) {
+                    listaItems = json.datos.sort((a, b) => a.id_item - b.id_item);
+                    renderTablaItems(listaItems);
+                }
+            } catch (error) { console.error(error); }
+        }
+
+        function renderTablaItems(datos) {
+            const tbody = document.getElementById('tbodyItems');
+            tbody.innerHTML = '';
+
+            if (!datos || datos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No hay ítems registrados.</td></tr>';
+                return;
+            }
+
+            datos.forEach(item => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${item.codigo}</strong></td>
+                    <td>${item.nombre}</td>
+                    <td>${item.descripcion || 'Sin descripción'}</td>
+                    <td><span class="badge ${item.estado === 'Vigente' ? 'bg-success' : 'bg-secondary'}">${item.estado || 'Vigente'}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="modalEditarItem(${item.id_item})">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarItem(${item.id_item})">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filtrarItems() {
+            const texto = document.getElementById('busquedaItem').value.toLowerCase();
+            renderTablaItems(listaItems.filter(i => i.nombre.toLowerCase().includes(texto) || i.codigo.toLowerCase().includes(texto)));
+        }
+
+        function modalNuevoItem() {
+            Swal.fire({
+                title: 'Nuevo Ítem / Meta',
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Código Meta *</label>
+                            <input id="sw-ite-codigo" class="form-control" placeholder="Ej: MET-2024-02">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Nombre de la Meta *</label>
+                            <input id="sw-ite-nombre" class="form-control" placeholder="Ej: Mantención de plazas">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Descripción</label>
+                            <input id="sw-ite-desc" class="form-control" placeholder="Detalles de la meta">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Estado</label>
+                            <select id="sw-ite-est" class="form-select">
+                                <option value="Vigente">Vigente</option>
+                                <option value="Finalizada">Finalizada</option>
+                            </select>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Guardar Meta',
+                preConfirm: () => {
+                    const codigo = document.getElementById('sw-ite-codigo').value.trim();
+                    const nombre = document.getElementById('sw-ite-nombre').value.trim();
+
+                    if (!codigo || !nombre) {
+                        Swal.showValidationMessage('El Código y Nombre son obligatorios.');
+                        return false;
+                    }
+                    return {
+                        codigo: codigo,
+                        nombre: nombre,
+                        descripcion: document.getElementById('sw-ite-desc').value.trim() || 'Sin descripción',
+                        estado: document.getElementById('sw-ite-est').value
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    await fetch(`${API}/items`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result.value)
+                    });
+                    Swal.fire('¡Guardado!', 'Meta agregada a MySQL.', 'success');
+                    cargarItemsBD();
+                }
+            });
+        }
+
+        function modalEditarItem(id) {
+            const item = listaItems.find(i => i.id_item === id);
+            if (!item) return;
+
+            Swal.fire({
+                title: `Editar Meta #${id}`,
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Código *</label>
+                            <input id="sw-edit-ite-codigo" class="form-control" value="${item.codigo}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Nombre *</label>
+                            <input id="sw-edit-ite-nombre" class="form-control" value="${item.nombre}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Descripción</label>
+                            <input id="sw-edit-ite-desc" class="form-control" value="${item.descripcion || ''}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Estado</label>
+                            <select id="sw-edit-ite-est" class="form-select">
+                                <option value="Vigente" ${item.estado === 'Vigente' ? 'selected' : ''}>Vigente</option>
+                                <option value="Finalizada" ${item.estado === 'Finalizada' ? 'selected' : ''}>Finalizada</option>
+                            </select>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Actualizar',
+                preConfirm: () => {
+                    return {
+                        codigo: document.getElementById('sw-edit-ite-codigo').value.trim(),
+                        nombre: document.getElementById('sw-edit-ite-nombre').value.trim(),
+                        descripcion: document.getElementById('sw-edit-ite-desc').value.trim(),
+                        estado: document.getElementById('sw-edit-ite-est').value
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    await fetch(`${API}/items/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result.value)
+                    });
+                    Swal.fire('¡Actualizado!', 'Meta modificada en MySQL.', 'success');
+                    cargarItemsBD();
+                }
+            });
+        }
+
+        async function eliminarItem(id) {
+            Swal.fire({
+                title: '¿Eliminar Meta?',
+                text: 'Se borra de la base de datos.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Eliminar'
+            }).then(async (res) => {
+                if (res.isConfirmed) {
+                    await fetch(`${API}/items/${id}`, { method: 'DELETE' });
+                    cargarItemsBD();
+                }
+            });
+        }
+
+        function exportarExcelItems() {
+            let csv = 'Codigo,Nombre,Descripcion,Estado\n';
+            listaItems.forEach(i => {
+                csv += `"${i.codigo}","${i.nombre}","${i.descripcion || ''}","${i.estado || 'Vigente'}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Items_y_Metas.csv';
+            a.click();
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('sgr_user');
+            sessionStorage.removeItem('sgr_user');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>

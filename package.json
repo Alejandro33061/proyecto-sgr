@@ -1,0 +1,28 @@
+{
+  "name": "mockup-gestion-resultados-main",
+  "version": "1.0.0",
+  "description": "Este repositorio contiene el prototipo funcional (Mockup) para el \"Sistema de Gestión de Resultados\". Su objetivo es demostrar el diseño de interacción, la navegación entre pantallas principales y la validación de formularios de manera frontal (Front-end), sin conexión a base de datos, cumpliendo con la entrega de Análisis y Diseño de Software.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Alejandro33061/proyecto-sgr.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Alejandro33061/proyecto-sgr/issues"
+  },
+  "homepage": "https://github.com/Alejandro33061/proyecto-sgr#readme",
+  "dependencies": {
+    "body-parser": "^2.3.0",
+    "cors": "^2.8.6",
+    "express": "^5.3.0",
+    "mysql2": "^3.24.6",
+    "nodemailer": "^10.1.2"
+  }
+}

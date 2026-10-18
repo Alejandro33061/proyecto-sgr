@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sub Atención - Muni La Serena</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
+    <link href="style.css" rel="stylesheet">
+</head>
+<body class="min-vh-100" style="background-color: #f4f6f9;">
+
+    <!-- NAVBAR CENTRALIZADO -->
+    <div id="navbar-container"></div>
+
+    <div class="container mt-4 mb-5">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h3 style="color: #8B1E28;" class="m-0 fw-bold">Sub Atención</h3>
+                <p class="text-muted m-0">Administración de sub-categorías asociadas a Tipos de Atención.</p>
+            </div>
+        </div>
+
+        <div class="card p-3 shadow-sm border-0">
+            <div class="row g-2 align-items-center mb-3">
+                <div class="col-md-5">
+                    <input type="text" id="busquedaSub" class="form-control" placeholder="Buscar por nombre, código o tipo..." oninput="filtrarSubAtenciones()">
+                </div>
+                <div class="col-md-3">
+                    <select id="filtroEstadoSub" class="form-select" onchange="filtrarSubAtenciones()">
+                        <option value="">Todos los estados</option>
+                        <option value="ACTIVO">ACTIVO</option>
+                        <option value="INACTIVO">INACTIVO</option>
+                    </select>
+                </div>
+                <div class="col-md-2">
+                    <button class="btn btn-outline-success w-100" onclick="exportarExcelSubAtenciones()">
+                        Exportar Excel
+                    </button>
+                </div>
+                <div class="col-md-2 text-end">
+                    <button class="btn text-white w-100" style="background-color: #8B1E28;" onclick="modalNuevaSubAtencion()">
+                        + Nuevo registro
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table table-hover align-middle border">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>Código</th>
+                            <th>Nombre</th>
+                            <th>Tipo asociado</th>
+                            <th>Estado</th>
+                            <th>Acciones</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tbodySubAtenciones">
+                        <tr><td colspan="5" class="text-center">Cargando sub-atenciones...</td></tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script>
+        const API = window.location.protocol.startsWith('http') 
+            ? `${window.location.origin}/api` 
+            : 'http://localhost:3000/api';
+
+        let listaSubAtenciones = [];
+        let listaTiposPadre = [];
+
+        document.addEventListener('DOMContentLoaded', () => {
+            fetch('navbar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('navbar-container').innerHTML = html;
+                    marcarBotonActivo();
+                    cargarSesion();
+                });
+
+            cargarTiposPadre();
+            cargarSubAtencionesBD();
+        });
+
+        function marcarBotonActivo() {
+            let paginaActual = window.location.pathname.split("/").pop();
+            if (!paginaActual || paginaActual === '') paginaActual = 'sub-atenciones.html';
+
+            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
+            enlaces.forEach(enlace => {
+                const href = enlace.getAttribute('href');
+                if (href === paginaActual) {
+                    enlace.classList.add('activo-fijo');
+                } else {
+                    enlace.classList.remove('activo-fijo');
+                }
+            });
+        }
+
+        function cargarSesion() {
+            const sessionUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user'));
+            if (sessionUser) {
+                if (document.getElementById('usrHeaderNombre')) document.getElementById('usrHeaderNombre').textContent = sessionUser.nombre;
+                if (document.getElementById('usrHeaderRol')) document.getElementById('usrHeaderRol').textContent = sessionUser.rol;
+            }
+        }
+
+        async function cargarTiposPadre() {
+            try {
+                const res = await fetch(`${API}/tipos-atencion`);
+                const json = await res.json();
+                if (json.success) listaTiposPadre = json.datos;
+            } catch (e) { console.error(e); }
+        }
+
+        async function cargarSubAtencionesBD() {
+            try {
+                const response = await fetch(`${API}/sub-atenciones`);
+                const json = await response.json();
+                if (json.success) {
+                    listaSubAtenciones = json.datos.sort((a, b) => (a.id_sub || a.id_sub_atencion) - (b.id_sub || b.id_sub_atencion));
+                    renderTablaSubAtenciones(listaSubAtenciones);
+                }
+            } catch (error) { console.error(error); }
+        }
+
+        function renderTablaSubAtenciones(datos) {
+            const tbody = document.getElementById('tbodySubAtenciones');
+            tbody.innerHTML = '';
+
+            if (!datos || datos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No hay sub-atenciones registradas.</td></tr>';
+                return;
+            }
+
+            datos.forEach(sa => {
+                const idReal = sa.id_sub || sa.id_sub_atencion;
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><strong>${sa.codigo}</strong></td>
+                    <td>${sa.nombre}</td>
+                    <td><span class="badge bg-info text-dark">${sa.tipo_asociado || 'General'}</span></td>
+                    <td><span class="badge ${sa.estado === 'ACTIVO' ? 'bg-success' : 'bg-secondary'}">${sa.estado}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="modalEditarSubAtencion(${idReal})">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarSubAtencion(${idReal})">Eliminar</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function filtrarSubAtenciones() {
+            const texto = document.getElementById('busquedaSub').value.toLowerCase();
+            const estado = document.getElementById('filtroEstadoSub').value;
+
+            const filtrados = listaSubAtenciones.filter(sa => {
+                const coincideTexto = sa.nombre.toLowerCase().includes(texto) || sa.codigo.toLowerCase().includes(texto) || (sa.tipo_asociado || '').toLowerCase().includes(texto);
+                const coincideEstado = estado === '' || sa.estado === estado;
+                return coincideTexto && coincideEstado;
+            });
+
+            renderTablaSubAtenciones(filtrados);
+        }
+
+        function modalNuevaSubAtencion() {
+            let opcionesTipos = listaTiposPadre.map(t => `<option value="${t.id_tipo || t.id_tipo_atencion}">${t.nombre}</option>`).join('');
+
+            Swal.fire({
+                title: 'Nueva Sub Atención',
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Código *</label>
+                            <input id="sw-sa-codigo" class="form-control" placeholder="Ej: SA001">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Nombre Sub Atención *</label>
+                            <input id="sw-sa-nombre" class="form-control" placeholder="Ej: Ayuda social, Beca municipal">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Tipo de Atención Asociado *</label>
+                            <select id="sw-sa-tipo" class="form-select">
+                                ${opcionesTipos}
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Estado</label>
+                            <select id="sw-sa-est" class="form-select">
+                                <option value="ACTIVO">ACTIVO</option>
+                                <option value="INACTIVO">INACTIVO</option>
+                            </select>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Guardar',
+                preConfirm: () => {
+                    const codigo = document.getElementById('sw-sa-codigo').value.trim();
+                    const nombre = document.getElementById('sw-sa-nombre').value.trim();
+                    if (!codigo || !nombre) {
+                        Swal.showValidationMessage('El Código y Nombre son obligatorios.');
+                        return false;
+                    }
+                    return {
+                        codigo,
+                        nombre,
+                        id_tipo_atencion: document.getElementById('sw-sa-tipo').value,
+                        estado: document.getElementById('sw-sa-est').value
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    await fetch(`${API}/sub-atenciones`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result.value)
+                    });
+                    Swal.fire('¡Guardado!', 'Sub Atención agregada.', 'success');
+                    cargarSubAtencionesBD();
+                }
+            });
+        }
+
+        function modalEditarSubAtencion(id) {
+            const sa = listaSubAtenciones.find(item => (item.id_sub || item.id_sub_atencion) === id);
+            if (!sa) return;
+
+            let opcionesTipos = listaTiposPadre.map(t => {
+                const idPadre = t.id_tipo || t.id_tipo_atencion;
+                return `<option value="${idPadre}" ${t.nombre === sa.tipo_asociado ? 'selected' : ''}>${t.nombre}</option>`;
+            }).join('');
+
+            Swal.fire({
+                title: `Editar Sub Atención`,
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Código *</label>
+                            <input id="sw-edit-sa-codigo" class="form-control" value="${sa.codigo}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Nombre *</label>
+                            <input id="sw-edit-sa-nombre" class="form-control" value="${sa.nombre}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Tipo Asociado *</label>
+                            <select id="sw-edit-sa-tipo" class="form-select">
+                                ${opcionesTipos}
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Estado</label>
+                            <select id="sw-edit-sa-est" class="form-select">
+                                <option value="ACTIVO" ${sa.estado === 'ACTIVO' ? 'selected' : ''}>ACTIVO</option>
+                                <option value="INACTIVO" ${sa.estado === 'INACTIVO' ? 'selected' : ''}>INACTIVO</option>
+                            </select>
+                        </div>
+                    </div>
+                `,
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Actualizar',
+                preConfirm: () => {
+                    const codigo = document.getElementById('sw-edit-sa-codigo').value.trim();
+                    const nombre = document.getElementById('sw-edit-sa-nombre').value.trim();
+                    if (!codigo || !nombre) {
+                        Swal.showValidationMessage('El Código y Nombre son obligatorios.');
+                        return false;
+                    }
+                    return {
+                        codigo,
+                        nombre,
+                        id_tipo_atencion: document.getElementById('sw-edit-sa-tipo').value,
+                        estado: document.getElementById('sw-edit-sa-est').value
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const res = await fetch(`${API}/sub-atenciones/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(result.value)
+                    });
+                    const json = await res.json();
+                    if (json.success) {
+                        Swal.fire('¡Actualizado!', 'Sub atención modificada.', 'success');
+                        cargarSubAtencionesBD();
+                    } else {
+                        Swal.fire('Error', json.message, 'error');
+                    }
+                }
+            });
+        }
+
+        async function eliminarSubAtencion(id) {
+            Swal.fire({
+                title: '¿Eliminar Sub Atención?',
+                text: 'Se verificará la integridad con las atenciones antes de borrar.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Eliminar'
+            }).then(async (res) => {
+                if (res.isConfirmed) {
+                    const response = await fetch(`${API}/sub-atenciones/${id}`, { method: 'DELETE' });
+                    const json = await response.json();
+                    if (json.success) {
+                        Swal.fire('¡Eliminado!', 'Sub atención removida.', 'success');
+                        cargarSubAtencionesBD();
+                    } else {
+                        Swal.fire('Operación Bloqueada', json.message, 'error');
+                    }
+                }
+            });
+        }
+
+        function exportarExcelSubAtenciones() {
+            let csv = 'Codigo,Nombre,TipoAsociado,Estado\n';
+            listaSubAtenciones.forEach(sa => {
+                csv += `"${sa.codigo}","${sa.nombre}","${sa.tipo_asociado || ''}","${sa.estado}"\n`;
+            });
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'Sub_Atenciones.csv';
+            a.click();
+        }
+
+        function cerrarSesion() {
+            localStorage.removeItem('sgr_user');
+            sessionStorage.removeItem('sgr_user');
+            window.location.href = 'index.html';
+        }
+    </script>
+</body>
+</html>
