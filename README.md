@@ -8,10 +8,10 @@ Sistema web unificado para el registro, derivación, seguimiento y control de at
 ---
 
 ## 👥 Integrantes del Equipo
-* **Integrantes del proyecto SGR**
- **Javier Enrique Pérez González**
- **Alejandro Cantillanes**
- **Joaquín Alonso Galleguillos Gallardo**
+* Integrantes del proyecto SGR
+ Javier Enrique Pérez González
+ Alejandro Cantillanes
+ Joaquín Alonso Galleguillos Gallardo
 ---
 
 ## 🛠️ Arquitectura y Tecnologías
@@ -68,9 +68,9 @@ node server.js
 
 
 4. URL de Producción en AWS: 
-   http://3.226.143.33:3000/
+   http://54.157.1.227:3000
 
-   php: http://3.226.143.33:8080/
+   php: http://54.157.1.227:8080
 
 ---
 
@@ -78,5 +78,5 @@ node server.js
 
 | Rol | Usuario / Correo | Contraseña | Alcance / Permisos |
 | :--- | :--- | :--- | :--- |
-| **Administrador** | admin@laserena.cl | Admin1234 | Acceso comunal total a todos los mantenedores y configuraciones. |
-| **Delegado Territorial** | alan.vk@laserena.cl | Delegado1234! | Gestión del contexto de su delegación asignada (Sector Centro). |
+| **Administrador** | admin@laserena.cl | admin1234 | Acceso comunal total a todos los mantenedores y configuraciones. |
+| **Delegado Territorial** | alan.vk@laserena.cl | Delegado1234 | Gestión del contexto de su delegación asignada (Sector Centro). |
