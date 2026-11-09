@@ -16,15 +16,16 @@
     <div class="container mt-4 mb-5">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-                <h3 style="color: #8B1E28;" class="m-0 fw-bold"> Roles y Permisos</h3>
+                <h3 style="color: #8B1E28;" class="m-0 fw-bold">Roles y Permisos</h3>
                 <p class="text-muted m-0">Gestión de perfiles de acceso para usuarios del sistema.</p>
             </div>
         </div>
 
         <div class="card p-3 shadow-sm border-0">
+            <!-- Barra de Herramientas -->
             <div class="row g-2 align-items-center mb-3">
                 <div class="col-md-6">
-                    <input type="text" id="busquedaRol" class="form-control" placeholder="Buscar por nombre de rol..." oninput="filtrarRoles()">
+                    <input type="text" id="busquedaRol" class="form-control" placeholder="Buscar por nombre, código u otro campo..." oninput="filtrarRoles(1)">
                 </div>
                 <div class="col-md-3">
                     <button class="btn btn-outline-success w-100" onclick="exportarExcelRoles()">
@@ -38,11 +39,12 @@
                 </div>
             </div>
 
+            <!-- Tabla de Roles -->
             <div class="table-responsive">
                 <table class="table table-hover align-middle border">
                     <thead class="table-dark">
                         <tr>
-                            <th>ID</th>
+                            <th>Código</th>
                             <th>Nombre del Rol</th>
                             <th>Descripción</th>
                             <th>Alcance</th>
@@ -54,17 +56,31 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- PIE DE PAGINACIÓN -->
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                <div class="text-muted small fw-bold" id="infoPaginacionRoles">
+                    Mostrando 0 a 0 de 0 registros
+                </div>
+                <nav aria-label="Navegación de páginas">
+                    <ul class="pagination pagination-sm m-0" id="paginadorRoles">
+                    </ul>
+                </nav>
+            </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="navbar.js"></script>
     <script>
         const API = window.location.protocol.startsWith('http') 
             ? `${window.location.origin}/api` 
             : 'http://localhost:3000/api';
 
         let listaRoles = [];
+        let paginaActual = 1;
+        const limitePorPagina = 5;
 
         document.addEventListener('DOMContentLoaded', () => {
             fetch('navbar.html')
@@ -72,20 +88,20 @@
                 .then(html => {
                     document.getElementById('navbar-container').innerHTML = html;
                     marcarBotonActivo();
-                    cargarSesion();
+                    sincronizarSesionYNavbar();
                 });
 
-            cargarRolesBD();
+            cargarRolesBD(1);
         });
 
         function marcarBotonActivo() {
-            let paginaActual = window.location.pathname.split("/").pop();
-            if (!paginaActual || paginaActual === '') paginaActual = 'roles.html';
+            let pag = window.location.pathname.split("/").pop();
+            if (!pag || pag === '') pag = 'roles.html';
 
             const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
             enlaces.forEach(enlace => {
                 const href = enlace.getAttribute('href');
-                if (href === paginaActual) {
+                if (href === pag) {
                     enlace.classList.add('activo-fijo');
                 } else {
                     enlace.classList.remove('activo-fijo');
@@ -93,23 +109,79 @@
             });
         }
 
-        function cargarSesion() {
-            const sessionUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user'));
-            if (sessionUser) {
-                if (document.getElementById('usrHeaderNombre')) document.getElementById('usrHeaderNombre').textContent = sessionUser.nombre;
-                if (document.getElementById('usrHeaderRol')) document.getElementById('usrHeaderRol').textContent = sessionUser.rol;
+        async function sincronizarSesionYNavbar() {
+            try {
+                const response = await fetch(`${API}/sesion-actual?t=${new Date().getTime()}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.usuario) {
+                        const usr = data.usuario;
+                        localStorage.setItem('sgr_user', JSON.stringify(usr));
+
+                        const elNombre = document.getElementById('usrHeaderNombre');
+                        const elRol = document.getElementById('usrHeaderRol');
+                        if (elNombre) elNombre.textContent = usr.nombre || usr.nombre_usuario;
+                        if (elRol) elRol.textContent = usr.rol;
+                    }
+                }
+            } catch (error) {
+                console.error('Error al sincronizar sesión:', error);
             }
         }
 
-        async function cargarRolesBD() {
+        // EXTRAER EL NÚMERO CORRELATIVO DEL CÓDIGO (Ej: ROL02 -> 2)
+        function extraerNumeroCodigoRol(item) {
+            if (item && item.codigo && item.codigo !== 'ROL00') {
+                const match = item.codigo.match(/\d+/);
+                if (match) return parseInt(match[0], 10);
+            }
+            return Number(item ? item.id_rol : 0) || 0;
+        }
+
+        async function cargarRolesBD(pagina = 1) {
             try {
-                const response = await fetch(`${API}/roles`);
+                const response = await fetch(`${API}/roles`, { credentials: 'include' });
                 const json = await response.json();
+                
                 if (json.success) {
-                    listaRoles = json.datos.sort((a, b) => a.id_rol - b.id_rol);
-                    renderTablaRoles(listaRoles);
+                    // ORDENAR NUMÉRICAMENTE POR EL CÓDIGO DEL ROL
+                    listaRoles = json.datos.sort((a, b) => extraerNumeroCodigoRol(a) - extraerNumeroCodigoRol(b));
+                    filtrarRoles(pagina);
                 }
-            } catch (error) { console.error(error); }
+            } catch (error) { 
+                console.error("Error al cargar roles:", error); 
+            }
+        }
+
+        function filtrarRoles(pagina = 1) {
+            paginaActual = pagina;
+            const textoBusqueda = document.getElementById('busquedaRol').value.trim().toLowerCase();
+
+            let rolesFiltrados = listaRoles;
+            if (textoBusqueda !== '') {
+                rolesFiltrados = rolesFiltrados.filter(r => {
+                    const cod = r.codigo && r.codigo !== 'ROL00' ? r.codigo : `ROL${String(extraerNumeroCodigoRol(r)).padStart(2, '0')}`;
+                    return cod.toLowerCase().includes(textoBusqueda) ||
+                        r.nombre.toLowerCase().includes(textoBusqueda) || 
+                        (r.descripcion && r.descripcion.toLowerCase().includes(textoBusqueda)) ||
+                        (r.alcance && r.alcance.toLowerCase().includes(textoBusqueda));
+                });
+            }
+
+            const totalRegistros = rolesFiltrados.length;
+            const totalPaginas = Math.ceil(totalRegistros / limitePorPagina) || 1;
+            
+            const inicio = (paginaActual - 1) * limitePorPagina;
+            const fin = inicio + limitePorPagina;
+            const rolesPagina = rolesFiltrados.slice(inicio, fin);
+
+            renderTablaRoles(rolesPagina);
+            renderizarPaginador(totalRegistros, totalPaginas, totalRegistros > 0 ? inicio + 1 : 0, Math.min(fin, totalRegistros));
         }
 
         function renderTablaRoles(datos) {
@@ -122,34 +194,88 @@
             }
 
             datos.forEach(r => {
+                const idReal = Number(r.id_rol);
+                const codigoFormateado = (r.codigo && r.codigo !== 'ROL00') ? r.codigo : `ROL${String(extraerNumeroCodigoRol(r)).padStart(2, '0')}`;
+
                 const tr = document.createElement('tr');
                 tr.innerHTML = `
-                    <td>#${r.id_rol}</td>
-                    <td><strong>${r.nombre}</strong></td>
+                    <td><strong>${codigoFormateado}</strong></td>
+                    <td>${r.nombre}</td>
                     <td>${r.descripcion || 'Sin descripción'}</td>
                     <td>${r.alcance || 'Comunal'}</td>
                     <td>
-                        <button class="btn btn-sm btn-outline-warning me-1" onclick="modalEditarRol(${r.id_rol})">Editar</button>
-                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarRol(${r.id_rol})">Eliminar</button>
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="modalEditarRol(${idReal})">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger" onclick="eliminarRol(${idReal})">Eliminar</button>
                     </td>
                 `;
                 tbody.appendChild(tr);
             });
         }
 
-        function filtrarRoles() {
-            const texto = document.getElementById('busquedaRol').value.toLowerCase();
-            renderTablaRoles(listaRoles.filter(r => r.nombre.toLowerCase().includes(texto)));
+        function renderizarPaginador(totalRegistros, totalPaginas, desde, hasta) {
+            const infoText = document.getElementById('infoPaginacionRoles');
+            const ulPaginador = document.getElementById('paginadorRoles');
+
+            if (totalRegistros === 0) {
+                infoText.textContent = 'Mostrando 0 a 0 de 0 registros';
+                ulPaginador.innerHTML = '';
+                return;
+            } else {
+                infoText.textContent = `Mostrando ${desde} a ${hasta} de ${totalRegistros} registros`;
+            }
+
+            ulPaginador.innerHTML = '';
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginaActual === 1 ? 'disabled' : ''}">
+                    <button class="page-link" onclick="filtrarRoles(${paginaActual - 1})">Anterior</button>
+                </li>
+            `;
+
+            for (let i = 1; i <= totalPaginas; i++) {
+                ulPaginador.innerHTML += `
+                    <li class="page-item ${i === paginaActual ? 'active' : ''}">
+                        <button class="page-link" ${i === paginaActual ? 'style="background-color: #8B1E28; border-color: #8B1E28;"' : ''} onclick="filtrarRoles(${i})">${i}</button>
+                    </li>
+                `;
+            }
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginaActual === totalPaginas ? 'disabled' : ''}">
+                    <button class="page-link" onclick="filtrarRoles(${paginaActual + 1})">Siguiente</button>
+                </li>
+            `;
+        }
+
+        // ENCONTRAR EL PRIMER NÚMERO CORRELATIVO LIBRE
+        function obtenerSiguienteCodigoRol(lista) {
+            const numerosUsados = lista
+                .map(r => extraerNumeroCodigoRol(r))
+                .filter(n => n > 0)
+                .sort((a, b) => a - b);
+
+            let siguiente = 1;
+            while (numerosUsados.includes(siguiente)) {
+                siguiente++;
+            }
+
+            return `ROL${String(siguiente).padStart(2, '0')}`;
         }
 
         function modalNuevoRol() {
+            const codigoSugerido = obtenerSiguienteCodigoRol(listaRoles);
+
             Swal.fire({
                 title: 'Nuevo Rol de Sistema',
                 html: `
                     <div class="text-start" style="font-size: 0.9rem;">
                         <div class="mb-2">
+                            <label class="fw-bold mb-1">Código (Automático)</label>
+                            <input id="sw-rol-codigo" class="form-control bg-light" value="${codigoSugerido}" readonly style="background-color: #e9ecef;">
+                        </div>
+                        <div class="mb-2">
                             <label class="fw-bold mb-1">Nombre del Rol *</label>
-                            <input id="sw-rol-nombre" class="form-control" placeholder="Nombre del rol">
+                            <input id="sw-rol-nombre" class="form-control" placeholder="Ej: Inspector Municipal">
                         </div>
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Descripción</label>
@@ -167,11 +293,13 @@
                 cancelButtonText: 'Cancelar',
                 preConfirm: () => {
                     const nombre = document.getElementById('sw-rol-nombre').value.trim();
+                    const codigoVal = document.getElementById('sw-rol-codigo').value.trim();
                     if (!nombre) {
                         Swal.showValidationMessage('Ingresa el Nombre del Rol.');
                         return false;
                     }
                     return {
+                        codigo: codigoVal,
                         nombre: nombre,
                         descripcion: document.getElementById('sw-rol-desc').value.trim() || 'Sin descripción',
                         permisos: 'Lectura/Escritura',
@@ -180,25 +308,47 @@
                 }
             }).then(async (result) => {
                 if (result.isConfirmed) {
-                    await fetch(`${API}/roles`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(result.value)
-                    });
-                    Swal.fire('¡Guardado!', 'Rol registrado con éxito.', 'success');
-                    cargarRolesBD();
+                    try {
+                        const response = await fetch(`${API}/roles`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
+                            body: JSON.stringify(result.value)
+                        });
+                        const json = await response.json();
+                        if (json.success) {
+                            Swal.fire('¡Guardado!', 'Rol registrado con éxito.', 'success');
+                            cargarRolesBD(paginaActual);
+                        } else {
+                            Swal.fire('Error', json.message, 'error');
+                        }
+                    } catch (e) {
+                        Swal.fire('Error', 'No se pudo registrar el rol.', 'error');
+                    }
                 }
             });
         }
 
         function modalEditarRol(id) {
-            const r = listaRoles.find(item => item.id_rol === id);
-            if (!r) return;
+            const idBuscado = Number(id);
+            const r = listaRoles.find(item => Number(item.id_rol) === idBuscado);
+            
+            if (!r) {
+                console.error("Rol no encontrado en listaRoles:", id);
+                return;
+            }
+
+            const numCodigo = extraerNumeroCodigoRol(r);
+            const codigoActual = (r.codigo && r.codigo !== 'ROL00') ? r.codigo : `ROL${String(numCodigo).padStart(2, '0')}`;
 
             Swal.fire({
-                title: `Editar Rol #${id}`,
+                title: `Editar Rol (${codigoActual})`,
                 html: `
                     <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Código</label>
+                            <input id="sw-edit-rol-codigo" class="form-control bg-light" value="${codigoActual}" readonly style="background-color: #e9ecef;">
+                        </div>
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Nombre del Rol *</label>
                             <input id="sw-edit-rol-nombre" class="form-control" value="${r.nombre}">
@@ -224,6 +374,7 @@
                         return false;
                     }
                     return {
+                        codigo: document.getElementById('sw-edit-rol-codigo').value.trim(),
                         nombre: nombre,
                         descripcion: document.getElementById('sw-edit-rol-desc').value.trim() || 'Sin descripción',
                         permisos: 'Lectura/Escritura',
@@ -233,15 +384,16 @@
             }).then(async (result) => {
                 if (result.isConfirmed) {
                     try {
-                        const response = await fetch(`${API}/roles/${id}`, {
+                        const response = await fetch(`${API}/roles/${idBuscado}`, {
                             method: 'PUT',
                             headers: { 'Content-Type': 'application/json' },
+                            credentials: 'include',
                             body: JSON.stringify(result.value)
                         });
                         const json = await response.json();
                         if (json.success) {
                             Swal.fire('¡Actualizado!', 'Rol modificado en MySQL.', 'success');
-                            cargarRolesBD();
+                            cargarRolesBD(paginaActual);
                         } else {
                             Swal.fire('Error', json.message, 'error');
                         }
@@ -263,16 +415,18 @@
                 cancelButtonText: 'Cancelar'
             }).then(async (res) => {
                 if (res.isConfirmed) {
-                    await fetch(`${API}/roles/${id}`, { method: 'DELETE' });
-                    cargarRolesBD();
+                    await fetch(`${API}/roles/${id}`, { method: 'DELETE', credentials: 'include' });
+                    cargarRolesBD(paginaActual);
                 }
             });
         }
 
         function exportarExcelRoles() {
-            let csv = 'ID,Nombre,Descripcion,Alcance\n';
+            let csv = 'ID,Codigo,Nombre,Descripcion,Alcance\n';
             listaRoles.forEach(r => {
-                csv += `"${r.id_rol}","${r.nombre}","${r.descripcion || ''}","${r.alcance || ''}"\n`;
+                const numCodigo = extraerNumeroCodigoRol(r);
+                const cod = (r.codigo && r.codigo !== 'ROL00') ? r.codigo : `ROL${String(numCodigo).padStart(2, '0')}`;
+                csv += `"${r.id_rol}","${cod}","${r.nombre}","${r.descripcion || ''}","${r.alcance || ''}"\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);
@@ -280,12 +434,6 @@
             a.href = url;
             a.download = 'Roles_Sistema.csv';
             a.click();
-        }
-
-        function cerrarSesion() {
-            localStorage.removeItem('sgr_user');
-            sessionStorage.removeItem('sgr_user');
-            window.location.href = 'index.html';
         }
     </script>
 </body>

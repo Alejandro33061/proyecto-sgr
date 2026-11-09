@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Mantenedor Delegaciones - Muni La Serena</title>
+    <title>Delegaciones Municipales - Muni La Serena</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
     <link href="style.css" rel="stylesheet">
@@ -16,7 +16,7 @@
     <div class="container mt-4 mb-5">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-                <h3 style="color: #8B1E28;" class="m-0 fw-bold"> Delegaciones Municipales</h3>
+                <h3 style="color: #8B1E28;" class="m-0 fw-bold">Delegaciones Municipales</h3>
                 <p class="text-muted m-0">Administración de sedes territoriales registradas en el sistema.</p>
             </div>
         </div>
@@ -24,10 +24,10 @@
         <div class="card p-3 shadow-sm border-0">
             <div class="row g-2 align-items-center mb-3">
                 <div class="col-md-5">
-                    <input type="text" id="busquedaDelegacion" class="form-control" placeholder="Buscar por nombre o código..." oninput="filtrarDelegaciones()">
+                    <input type="text" id="busquedaDelegacion" class="form-control" placeholder="Buscar por nombre o código..." oninput="filtrarDelegaciones(1)">
                 </div>
                 <div class="col-md-3">
-                    <select id="filtroEstadoDelegacion" class="form-select" onchange="filtrarDelegaciones()">
+                    <select id="filtroEstadoDelegacion" class="form-select" onchange="filtrarDelegaciones(1)">
                         <option value="">Todos los estados</option>
                         <option value="ACTIVO">ACTIVO</option>
                         <option value="INACTIVO">INACTIVO</option>
@@ -57,9 +57,20 @@
                         </tr>
                     </thead>
                     <tbody id="tbodyDelegaciones">
-                        <tr><td colspan="5" class="text-center">Cargando delegaciones desde MySQL...</td></tr>
+                        <tr><td colspan="5" class="text-center">Cargando delegaciones...</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- PIE DE PAGINACIÓN MAQUETA -->
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                <div class="text-muted small fw-bold" id="infoPaginacionDelegaciones">
+                    Mostrando 0 a 0 de 0 registros
+                </div>
+                <nav aria-label="Navegación de páginas">
+                    <ul class="pagination pagination-sm m-0" id="paginadorDelegaciones">
+                    </ul>
+                </nav>
             </div>
         </div>
     </div>
@@ -73,20 +84,102 @@
             : 'http://localhost:3000/api';
 
         let listaDelegaciones = [];
+        let paginaActual = 1;
+        const limitePorPagina = 5;
 
         document.addEventListener('DOMContentLoaded', () => {
-            cargarDelegacionesBD();
+            fetch('navbar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('navbar-container').innerHTML = html;
+                    marcarBotonActivo();
+                    sincronizarSesionYNavbar();
+                });
+
+            cargarDelegacionesBD(1);
         });
 
-        async function cargarDelegacionesBD() {
+        function marcarBotonActivo() {
+            let pag = window.location.pathname.split("/").pop();
+            if (!pag || pag === '') pag = 'delegaciones.html';
+
+            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
+            enlaces.forEach(enlace => {
+                if (enlace.getAttribute('href') === pag) {
+                    enlace.classList.add('activo-fijo');
+                } else {
+                    enlace.classList.remove('activo-fijo');
+                }
+            });
+        }
+
+        async function sincronizarSesionYNavbar() {
             try {
-                const response = await fetch(`${API}/delegaciones`, { credentials: 'include' });
+                const response = await fetch(`${API}/sesion-actual?t=${new Date().getTime()}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.usuario) {
+                        const usr = data.usuario;
+                        localStorage.setItem('sgr_user', JSON.stringify(usr));
+
+                        const elNombre = document.getElementById('usrHeaderNombre');
+                        const elRol = document.getElementById('usrHeaderRol');
+                        const elDelegacion = document.getElementById('usrHeaderDelegacion');
+
+                        if (elNombre) elNombre.textContent = usr.nombre || usr.nombre_usuario;
+                        if (elRol) elRol.textContent = usr.rol;
+                        if (elDelegacion) elDelegacion.textContent = usr.delegacion || 'DEL-001 | Sector Centro';
+                    }
+                }
+            } catch (error) {
+                console.error('Error al sincronizar sesión:', error);
+            }
+        }
+
+        // EXTRAER EL NÚMERO DE UN CÓDIGO (Ej: DEL-002 -> 2)
+        function extraerNumeroCodigo(codigo) {
+            if (!codigo) return 0;
+            const match = codigo.match(/\d+/);
+            return match ? parseInt(match[0], 10) : 0;
+        }
+
+        async function cargarDelegacionesBD(pagina = 1) {
+            try {
+                const response = await fetch(`${API}/delegaciones?limit=100`, { credentials: 'include' });
                 const json = await response.json();
                 if (json.success) {
-                    listaDelegaciones = json.datos.sort((a, b) => a.id_delegacion - b.id_delegacion);
-                    renderTablaDelegaciones(listaDelegaciones);
+                    // ORDENAR NUMÉRICAMENTE POR EL CÓDIGO (DEL-001, DEL-002, DEL-003, etc.)
+                    listaDelegaciones = json.datos.sort((a, b) => extraerNumeroCodigo(a.codigo) - extraerNumeroCodigo(b.codigo));
+                    filtrarDelegaciones(pagina);
                 }
             } catch (error) { console.error(error); }
+        }
+
+        function filtrarDelegaciones(pagina = 1) {
+            paginaActual = pagina;
+            const texto = document.getElementById('busquedaDelegacion').value.trim().toLowerCase();
+            const estado = document.getElementById('filtroEstadoDelegacion').value;
+
+            const filtrados = listaDelegaciones.filter(d => {
+                const coincideTexto = d.nombre.toLowerCase().includes(texto) || d.codigo.toLowerCase().includes(texto);
+                const coincideEstado = estado === '' || d.estado === estado;
+                return coincideTexto && coincideEstado;
+            });
+
+            const totalRegistros = filtrados.length;
+            const totalPaginas = Math.ceil(totalRegistros / limitePorPagina) || 1;
+            
+            const inicio = (paginaActual - 1) * limitePorPagina;
+            const fin = inicio + limitePorPagina;
+            const datosPagina = filtrados.slice(inicio, fin);
+
+            renderTablaDelegaciones(datosPagina);
+            renderizarPaginador(totalRegistros, totalPaginas, totalRegistros > 0 ? inicio + 1 : 0, Math.min(fin, totalRegistros));
         }
 
         function renderTablaDelegaciones(datos) {
@@ -114,76 +207,108 @@
             });
         }
 
-        function filtrarDelegaciones() {
-            const texto = document.getElementById('busquedaDelegacion').value.toLowerCase();
-            const estado = document.getElementById('filtroEstadoDelegacion').value;
+        function renderizarPaginador(totalRegistros, totalPaginas, desde, hasta) {
+            const infoText = document.getElementById('infoPaginacionDelegaciones');
+            const ulPaginador = document.getElementById('paginadorDelegaciones');
 
-            const filtrados = listaDelegaciones.filter(d => {
-                const coincideTexto = d.nombre.toLowerCase().includes(texto) || d.codigo.toLowerCase().includes(texto);
-                const coincideEstado = estado === '' || d.estado === estado;
-                return coincideTexto && coincideEstado;
-            });
+            if (totalRegistros === 0) {
+                infoText.textContent = 'Mostrando 0 a 0 de 0 registros';
+                ulPaginador.innerHTML = '';
+                return;
+            } else {
+                infoText.textContent = `Mostrando ${desde} a ${hasta} de ${totalRegistros} registros`;
+            }
 
-            renderTablaDelegaciones(filtrados);
+            ulPaginador.innerHTML = '';
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginaActual === 1 ? 'disabled' : ''}">
+                    <button class="page-link" onclick="filtrarDelegaciones(${paginaActual - 1})">Anterior</button>
+                </li>
+            `;
+
+            for (let i = 1; i <= totalPaginas; i++) {
+                ulPaginador.innerHTML += `
+                    <li class="page-item ${i === paginaActual ? 'active' : ''}">
+                        <button class="page-link" ${i === paginaActual ? 'style="background-color: #8B1E28; border-color: #8B1E28;"' : ''} onclick="filtrarDelegaciones(${i})">${i}</button>
+                    </li>
+                `;
+            }
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginaActual === totalPaginas ? 'disabled' : ''}">
+                    <button class="page-link" onclick="filtrarDelegaciones(${paginaActual + 1})">Siguiente</button>
+                </li>
+            `;
+        }
+
+        function obtenerSiguienteCodigoDelegacion(lista) {
+            const numerosUsados = lista
+                .map(d => extraerNumeroCodigo(d.codigo))
+                .filter(n => n > 0)
+                .sort((a, b) => a - b);
+
+            let siguiente = 1;
+            while (numerosUsados.includes(siguiente)) {
+                siguiente++;
+            }
+
+            return `DEL-${String(siguiente).padStart(3, '0')}`;
         }
 
         function modalNuevaDelegacion() {
+            const codigoSugerido = obtenerSiguienteCodigoDelegacion(listaDelegaciones);
+
             Swal.fire({
                 title: 'Nueva Delegación Municipal',
                 html: `
                     <div class="text-start" style="font-size: 0.9rem;">
                         <div class="mb-2">
-                            <label class="fw-bold mb-1">Código *</label>
-                            <input id="sw-del-codigo" class="form-control" placeholder="Código de la delegación">
+                            <label class="fw-bold mb-1">Código (Automático)</label>
+                            <input id="sw-del-codigo" class="form-control bg-light" value="${codigoSugerido}" readonly style="background-color: #e9ecef;">
                         </div>
                         <div class="mb-2">
-                            <label class="fw-bold mb-1">Nombre Delegación *</label>
-                            <input id="sw-del-nombre" class="form-control" placeholder="Nombre completo">
+                            <label class="fw-bold mb-1">Nombre *</label>
+                            <input id="sw-del-nombre" class="form-control" placeholder="Ej: Sector Oriente">
                         </div>
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Dirección</label>
-                            <input id="sw-del-dir" class="form-control" placeholder="Dirección física">
+                            <input id="sw-del-dir" class="form-control" placeholder="Ej: Av. Balmaceda 123">
                         </div>
                         <div class="mb-2">
-                            <label class="fw-bold mb-1">Estado</label>
-                            <select id="sw-del-est" class="form-select">
-                                <option value="ACTIVO">ACTIVO</option>
-                                <option value="INACTIVO">INACTIVO</option>
-                            </select>
+                            <label class="fw-bold mb-1">Comuna</label>
+                            <input id="sw-del-comuna" class="form-control bg-light" value="La Serena" readonly disabled>
                         </div>
                     </div>
                 `,
                 showCancelButton: true,
                 confirmButtonColor: '#8B1E28',
-                confirmButtonText: 'Guardar Delegación',
+                confirmButtonText: 'Guardar',
                 preConfirm: () => {
                     const codigo = document.getElementById('sw-del-codigo').value.trim();
                     const nombre = document.getElementById('sw-del-nombre').value.trim();
                     if (!codigo || !nombre) {
-                        Swal.showValidationMessage('El Código y el Nombre son obligatorios.');
+                        Swal.showValidationMessage('El Nombre es obligatorio.');
                         return false;
                     }
                     return {
                         codigo,
                         nombre,
-                        direccion: document.getElementById('sw-del-dir').value.trim() || 'Sin Dirección',
+                        direccion: document.getElementById('sw-del-dir').value.trim() || 'Prat 451',
                         comuna: 'La Serena',
-                        estado: document.getElementById('sw-del-est').value
+                        estado: 'ACTIVO'
                     };
                 }
             }).then(async (result) => {
                 if (result.isConfirmed) {
-                    const res = await fetch(`${API}/delegaciones`, {
+                    await fetch(`${API}/delegaciones`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
-                    const json = await res.json();
-                    if (json.success) {
-                        Swal.fire('¡Guardado!', 'Delegación guardada en MySQL.', 'success');
-                        cargarDelegacionesBD();
-                    }
+                    Swal.fire('¡Guardado!', 'Delegación registrada.', 'success');
+                    cargarDelegacionesBD(paginaActual);
                 }
             });
         }
@@ -193,24 +318,28 @@
             if (!d) return;
 
             Swal.fire({
-                title: `Editar Delegación #${id}`,
+                title: `Editar Delegación`,
                 html: `
                     <div class="text-start" style="font-size: 0.9rem;">
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Código *</label>
-                            <input id="sw-edit-codigo" class="form-control" value="${d.codigo}">
+                            <input id="sw-edit-del-codigo" class="form-control" value="${d.codigo}">
                         </div>
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Nombre *</label>
-                            <input id="sw-edit-nombre" class="form-control" value="${d.nombre}">
+                            <input id="sw-edit-del-nombre" class="form-control" value="${d.nombre}">
                         </div>
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Dirección</label>
-                            <input id="sw-edit-dir" class="form-control" value="${d.direccion || ''}">
+                            <input id="sw-edit-del-dir" class="form-control" value="${d.direccion || ''}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Comuna</label>
+                            <input class="form-control bg-light" value="La Serena" readonly disabled>
                         </div>
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Estado</label>
-                            <select id="sw-edit-est" class="form-select">
+                            <select id="sw-edit-del-est" class="form-select">
                                 <option value="ACTIVO" ${d.estado === 'ACTIVO' ? 'selected' : ''}>ACTIVO</option>
                                 <option value="INACTIVO" ${d.estado === 'INACTIVO' ? 'selected' : ''}>INACTIVO</option>
                             </select>
@@ -221,18 +350,12 @@
                 confirmButtonColor: '#8B1E28',
                 confirmButtonText: 'Actualizar',
                 preConfirm: () => {
-                    const codigo = document.getElementById('sw-edit-codigo').value.trim();
-                    const nombre = document.getElementById('sw-edit-nombre').value.trim();
-                    if (!codigo || !nombre) {
-                        Swal.showValidationMessage('El Código y el Nombre son obligatorios.');
-                        return false;
-                    }
                     return {
-                        codigo,
-                        nombre,
-                        direccion: document.getElementById('sw-edit-dir').value.trim() || 'Sin Dirección',
+                        codigo: document.getElementById('sw-edit-del-codigo').value.trim(),
+                        nombre: document.getElementById('sw-edit-del-nombre').value.trim(),
+                        direccion: document.getElementById('sw-edit-del-dir').value.trim(),
                         comuna: 'La Serena',
-                        estado: document.getElementById('sw-edit-est').value
+                        estado: document.getElementById('sw-edit-del-est').value
                     };
                 }
             }).then(async (result) => {
@@ -243,24 +366,24 @@
                         credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
-                    Swal.fire('¡Actualizado!', 'Delegación modificada en MySQL.', 'success');
-                    cargarDelegacionesBD();
+                    Swal.fire('¡Actualizado!', 'Delegación modificada.', 'success');
+                    cargarDelegacionesBD(paginaActual);
                 }
             });
         }
 
         async function eliminarDelegacion(id) {
             Swal.fire({
-                title: '¿Eliminar delegación?',
-                text: 'Se borra de MySQL permanentemente.',
+                title: '¿Eliminar Delegación?',
+                text: 'Se borra de MySQL.',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
-                confirmButtonText: 'Sí, eliminar'
+                confirmButtonText: 'Eliminar'
             }).then(async (res) => {
                 if (res.isConfirmed) {
                     await fetch(`${API}/delegaciones/${id}`, { method: 'DELETE', credentials: 'include' });
-                    cargarDelegacionesBD();
+                    cargarDelegacionesBD(paginaActual);
                 }
             });
         }
@@ -274,7 +397,7 @@
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = 'Delegaciones_Municipales.csv';
+            a.download = 'Delegaciones.csv';
             a.click();
         }
     </script>

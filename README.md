@@ -57,7 +57,7 @@ node server.js
 Abre tu navegador e ingresa a: http://localhost:3000
 
 ## ☁️ Configuración y Despliegue en AWS (EC2)
-
+ñ
 1. Instancia EC2: Ubuntu Server / Amazon Linux.
 2. Puertos Abiertos (Security Groups): Custom TCP (3000), HTTP (80), SSH (22).
 3. Instalación y Arranque en la Nube:

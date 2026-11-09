@@ -16,18 +16,18 @@
     <div class="container mt-4 mb-5">
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
-                <h3 style="color: #8B1E28;" class="m-0 fw-bold"> Usuarios del Sistema</h3>
-                <p class="text-muted m-0">Gestión de cuentas y asignación de delegaciones territoriales.</p>
+                <h3 style="color: #8B1E28;" class="m-0 fw-bold">Usuarios del Sistema</h3>
+                <p class="text-muted m-0">Gestión de cuentas y asignación exclusiva de delegación territorial.</p>
             </div>
         </div>
 
         <div class="card p-3 shadow-sm border-0">
             <div class="row g-2 align-items-center mb-3">
                 <div class="col-md-5">
-                    <input type="text" id="busquedaUsuario" class="form-control" placeholder="Buscar por nombre, correo o rol..." oninput="filtrarUsuarios()">
+                    <input type="text" id="busquedaUsuario" class="form-control" placeholder="Buscar por nombre, correo o rol..." oninput="cargarUsuariosBD(1)">
                 </div>
                 <div class="col-md-3">
-                    <select id="filtroEstadoUsuario" class="form-select" onchange="filtrarUsuarios()">
+                    <select id="filtroEstadoUsuario" class="form-select" onchange="cargarUsuariosBD(1)">
                         <option value="">Todos los estados</option>
                         <option value="ACTIVO">ACTIVO</option>
                         <option value="INACTIVO">INACTIVO</option>
@@ -52,27 +52,44 @@
                             <th>Nombre</th>
                             <th>Correo</th>
                             <th>Rol</th>
-                            <th>Delegación</th>
+                            <th>Delegación Única</th>
                             <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="tbodyUsuarios">
-                        <tr><td colspan="6" class="text-center">Cargando usuarios desde MySQL...</td></tr>
+                        <tr><td colspan="6" class="text-center">Cargando usuarios...</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <!-- PIE DE PAGINACIÓN CORREGIDO -->
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                <div class="text-muted small fw-bold" id="infoPaginacionUsuarios">
+                    Mostrando 0 a 0 de 0 registros
+                </div>
+                <nav aria-label="Navegación de páginas">
+                    <ul class="pagination pagination-sm m-0" id="paginadorUsuarios">
+                    </ul>
+                </nav>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="navbar.js"></script>
     <script>
         const API = window.location.protocol.startsWith('http') 
             ? `${window.location.origin}/api` 
             : 'http://localhost:3000/api';
 
+        // Expresión regular para validar formato de e-mail estricto
+        const EMAIL_REGEX = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
         let listaUsuarios = [];
+        let listaDelegacionesDisp = [];
+        let paginaActual = 1;
 
         document.addEventListener('DOMContentLoaded', () => {
             fetch('navbar.html')
@@ -83,17 +100,17 @@
                     sincronizarSesionYNavbar();
                 });
 
-            cargarUsuariosBD();
+            cargarDelegacionesCatalogo();
+            cargarUsuariosBD(1);
         });
 
         function marcarBotonActivo() {
-            let paginaActual = window.location.pathname.split("/").pop();
-            if (!paginaActual || paginaActual === '') paginaActual = 'usuarios.html';
+            let pag = window.location.pathname.split("/").pop();
+            if (!pag || pag === '') pag = 'usuarios.html';
 
             const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
             enlaces.forEach(enlace => {
-                const href = enlace.getAttribute('href');
-                if (href === paginaActual) {
+                if (enlace.getAttribute('href') === pag) {
                     enlace.classList.add('activo-fijo');
                 } else {
                     enlace.classList.remove('activo-fijo');
@@ -103,73 +120,51 @@
 
         async function sincronizarSesionYNavbar() {
             try {
-                // Consultar el rol en tiempo real desde MySQL
                 const response = await fetch(`${API}/sesion-actual?t=${new Date().getTime()}`, {
                     method: 'GET',
                     credentials: 'include',
                     headers: { 'Cache-Control': 'no-cache' }
                 });
 
-                if (!response.ok) {
-                    window.location.href = 'index.html';
-                    return;
-                }
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.usuario) {
+                        const usr = data.usuario;
+                        localStorage.setItem('sgr_user', JSON.stringify(usr));
 
-                const data = await response.json();
-
-                if (data.success && data.usuario) {
-                    const usr = data.usuario;
-
-                    // Actualizar localStorage para mantener consistencia general
-                    localStorage.setItem('sgr_user', JSON.stringify(usr));
-
-                    // Actualizar el header del navbar con el rol REAL de MySQL
-                    const elNombre = document.getElementById('usrHeaderNombre');
-                    const elRol = document.getElementById('usrHeaderRol');
-                    if (elNombre) elNombre.textContent = usr.nombre || usr.nombre_usuario;
-                    if (elRol) elRol.textContent = usr.rol;
-
-                    // Evaluar permisos de acceso por rol
-                    const rolLower = (usr.rol || '').trim().toLowerCase();
-                    const esAdmin = rolLower.includes('admin') || rolLower.includes('coordinador');
-
-                    const modulosPrivados = ['nav-delegaciones', 'nav-roles', 'nav-usuarios', 'nav-items'];
-                    const paginasProhibidas = ['usuarios.html', 'roles.html', 'delegaciones.html', 'items.html'];
-                    const paginaActual = window.location.pathname.split("/").pop();
-
-                    if (!esAdmin) {
-                        // 1. Ocultar pestañas administrativas
-                        modulosPrivados.forEach(id => {
-                            const item = document.getElementById(id);
-                            if (item) item.style.display = 'none';
-                        });
-
-                        // 2. Redirigir a dashboard.html si intenta ver una vista restringida
-                        if (paginasProhibidas.some(p => paginaActual.includes(p))) {
-                            window.location.href = 'dashboard.html';
-                        }
-                    } else {
-                        // Mostrar todas las pestañas si es Administrador o Coordinador
-                        modulosPrivados.forEach(id => {
-                            const item = document.getElementById(id);
-                            if (item) item.style.display = 'block';
-                        });
+                        const elNombre = document.getElementById('usrHeaderNombre');
+                        const elRol = document.getElementById('usrHeaderRol');
+                        if (elNombre) elNombre.textContent = usr.nombre || usr.nombre_usuario;
+                        if (elRol) elRol.textContent = usr.rol;
                     }
-                } else {
-                    window.location.href = 'index.html';
                 }
             } catch (error) {
                 console.error('Error al sincronizar sesión:', error);
             }
         }
 
-        async function cargarUsuariosBD() {
+        async function cargarDelegacionesCatalogo() {
             try {
-                const response = await fetch(`${API}/usuarios`, { credentials: 'include' });
+                const res = await fetch(`${API}/delegaciones?limit=100`, { credentials: 'include' });
+                const json = await res.json();
+                if (json.success) {
+                    listaDelegacionesDisp = json.datos;
+                }
+            } catch (e) { console.error(e); }
+        }
+
+        async function cargarUsuariosBD(pagina = 1) {
+            paginaActual = pagina;
+            const search = document.getElementById('busquedaUsuario').value.trim();
+            const estado = document.getElementById('filtroEstadoUsuario').value;
+
+            try {
+                const response = await fetch(`${API}/usuarios?page=${pagina}&limit=5&search=${encodeURIComponent(search)}&estado=${encodeURIComponent(estado)}`, { credentials: 'include' });
                 const json = await response.json();
                 if (json.success) {
-                    listaUsuarios = json.usuarios.sort((a, b) => a.id_usuario - b.id_usuario);
+                    listaUsuarios = json.usuarios;
                     renderTablaUsuarios(listaUsuarios);
+                    renderizarPaginador(json.paginacion);
                 }
             } catch (error) { console.error(error); }
         }
@@ -185,11 +180,12 @@
 
             datos.forEach(u => {
                 const tr = document.createElement('tr');
+                const badgeClave = u.requiere_cambio_clave === 1 ? '<span class="badge bg-warning text-dark ms-1">Clave Provisoria</span>' : '';
                 tr.innerHTML = `
-                    <td><strong>${u.nombre}</strong><br><small class="text-muted">@${u.nombre_usuario}</small></td>
+                    <td><strong>${u.nombre}</strong> ${badgeClave}<br><small class="text-muted">@${u.nombre_usuario}</small></td>
                     <td>${u.correo}</td>
                     <td><span class="badge bg-primary">${u.rol}</span></td>
-                    <td>${u.delegacion || 'Sector Centro'}</td>
+                    <td><span class="badge bg-outline-dark border text-dark">${u.delegacion || 'Sector Centro'}</span></td>
                     <td><span class="badge ${u.estado === 'ACTIVO' ? 'bg-success' : 'bg-secondary'}">${u.estado || 'ACTIVO'}</span></td>
                     <td>
                         <button class="btn btn-sm btn-outline-warning me-1" onclick="modalEditarUsuario(${u.id_usuario})">Editar</button>
@@ -200,20 +196,49 @@
             });
         }
 
-        function filtrarUsuarios() {
-            const texto = document.getElementById('busquedaUsuario').value.toLowerCase();
-            const estado = document.getElementById('filtroEstadoUsuario').value;
+        function renderizarPaginador(paginacion) {
+            const infoText = document.getElementById('infoPaginacionUsuarios');
+            const ulPaginador = document.getElementById('paginadorUsuarios');
 
-            const filtrados = listaUsuarios.filter(u => {
-                const coincideTexto = u.nombre.toLowerCase().includes(texto) || u.correo.toLowerCase().includes(texto) || u.rol.toLowerCase().includes(texto);
-                const coincideEstado = estado === '' || (u.estado || 'ACTIVO') === estado;
-                return coincideTexto && coincideEstado;
-            });
+            if (!paginacion || paginacion.totalRegistros === 0) {
+                infoText.textContent = 'Mostrando 0 a 0 de 0 registros';
+                ulPaginador.innerHTML = '';
+                return;
+            }
 
-            renderTablaUsuarios(filtrados);
+            const desde = (paginacion.paginaActual - 1) * paginacion.limite + 1;
+            const hasta = Math.min(paginacion.paginaActual * paginacion.limite, paginacion.totalRegistros);
+            infoText.textContent = `Mostrando ${desde} a ${hasta} de ${paginacion.totalRegistros} registros`;
+
+            ulPaginador.innerHTML = '';
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginacion.paginaActual === 1 ? 'disabled' : ''}">
+                    <button class="page-link" onclick="cargarUsuariosBD(${paginacion.paginaActual - 1})">Anterior</button>
+                </li>
+            `;
+
+            for (let i = 1; i <= paginacion.totalPaginas; i++) {
+                ulPaginador.innerHTML += `
+                    <li class="page-item ${i === paginacion.paginaActual ? 'active' : ''}">
+                        <button class="page-link" ${i === paginacion.paginaActual ? 'style="background-color: #8B1E28; border-color: #8B1E28;"' : ''} onclick="cargarUsuariosBD(${i})">${i}</button>
+                    </li>
+                `;
+            }
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginacion.paginaActual === paginacion.totalPaginas ? 'disabled' : ''}">
+                    <button class="page-link" onclick="cargarUsuariosBD(${paginacion.paginaActual + 1})">Siguiente</button>
+                </li>
+            `;
         }
 
         function modalNuevoUsuario() {
+            let opcionesDel = `<option value="Todas (Comunal)">Todas (Comunal)</option>`;
+            listaDelegacionesDisp.forEach(d => {
+                opcionesDel += `<option value="${d.nombre}">${d.nombre}</option>`;
+            });
+
             Swal.fire({
                 title: 'Nuevo Usuario del Sistema',
                 html: `
@@ -224,18 +249,14 @@
                                 <input id="sw-usr-nombre" class="form-control" placeholder="Ej: Ana Pérez">
                             </div>
                             <div class="col-md-6">
-                                <label class="fw-bold mb-1">Nombre Usuario (Login) *</label>
+                                <label class="fw-bold mb-1">Nombre Usuario *</label>
                                 <input id="sw-usr-nick" class="form-control" placeholder="Ej: ana.perez">
                             </div>
                         </div>
                         <div class="row mb-2">
-                            <div class="col-md-6">
+                            <div class="col-md-12">
                                 <label class="fw-bold mb-1">Correo Electrónico *</label>
                                 <input id="sw-usr-correo" type="email" class="form-control" placeholder="ana@laserena.cl">
-                            </div>
-                            <div class="col-md-6">
-                                <label class="fw-bold mb-1">Contraseña *</label>
-                                <input id="sw-usr-clave" type="password" class="form-control" placeholder="******">
                             </div>
                         </div>
                         <div class="row mb-2">
@@ -244,19 +265,14 @@
                                 <select id="sw-usr-rol" class="form-select">
                                     <option value="Administrador">Administrador</option>
                                     <option value="Delegado Territorial">Delegado Territorial</option>
-                                    <option value="Operador">Operador</option>
-                                    <option value="Consultor">Consultor</option>
+                                    <option value="Funcionario">Funcionario</option>
+                                    <option value="Coordinador">Coordinador</option>
                                 </select>
                             </div>
                             <div class="col-md-6">
-                                <label class="fw-bold mb-1">Delegación Asignada *</label>
+                                <label class="fw-bold mb-1">Delegación Única *</label>
                                 <select id="sw-usr-del" class="form-select">
-                                    <option value="Sector Centro">Sector Centro</option>
-                                    <option value="Las Compañías">Las Compañías</option>
-                                    <option value="La Pampa">La Pampa</option>
-                                    <option value="La Antena / La Florida">La Antena / La Florida</option>
-                                    <option value="Avenida del Mar">Avenida del Mar</option>
-                                    <option value="Rural">Rural</option>
+                                    ${opcionesDel}
                                 </select>
                             </div>
                         </div>
@@ -270,18 +286,23 @@
                     const nombre = document.getElementById('sw-usr-nombre').value.trim();
                     const nick = document.getElementById('sw-usr-nick').value.trim();
                     const correo = document.getElementById('sw-usr-correo').value.trim();
-                    const clave = document.getElementById('sw-usr-clave').value.trim();
 
-                    if (!nombre || !nick || !correo || !clave) {
+                    if (!nombre || !nick || !correo) {
                         Swal.showValidationMessage('Todos los campos son obligatorios.');
                         return false;
                     }
+
+                    // Validación del formato de correo electrónico
+                    if (!EMAIL_REGEX.test(correo)) {
+                        Swal.showValidationMessage('Ingresa un correo electrónico válido (ejemplo: usuario@dominio.cl).');
+                        return false;
+                    }
+
                     return {
                         rut: '12345678-9',
                         nombre_usuario: nick,
                         nombre: nombre,
                         correo: correo,
-                        clave: clave,
                         rol: document.getElementById('sw-usr-rol').value,
                         delegacion: document.getElementById('sw-usr-del').value,
                         estado: 'ACTIVO'
@@ -297,8 +318,13 @@
                     });
                     const json = await res.json();
                     if (json.success) {
-                        Swal.fire('¡Creado!', 'Usuario guardado en MySQL.', 'success');
-                        cargarUsuariosBD();
+                        Swal.fire({
+                            title: '¡Usuario Creado!',
+                            text: 'El usuario se ha registrado correctamente. Se ha enviado una clave provisoria al correo ingresado.',
+                            icon: 'success',
+                            confirmButtonColor: '#8B1E28'
+                        });
+                        cargarUsuariosBD(paginaActual);
                     } else {
                         Swal.fire('Error', json.message, 'error');
                     }
@@ -309,6 +335,11 @@
         function modalEditarUsuario(id) {
             const u = listaUsuarios.find(item => item.id_usuario === id);
             if (!u) return;
+
+            let opcionesDel = `<option value="Todas (Comunal)" ${u.delegacion.includes('Todas') ? 'selected' : ''}>Todas (Comunal)</option>`;
+            listaDelegacionesDisp.forEach(d => {
+                opcionesDel += `<option value="${d.nombre}" ${u.delegacion.includes(d.nombre) ? 'selected' : ''}>${d.nombre}</option>`;
+            });
 
             Swal.fire({
                 title: `Editar Usuario #${id}`,
@@ -327,28 +358,23 @@
                         <div class="row mb-2">
                             <div class="col-md-6">
                                 <label class="fw-bold mb-1">Correo *</label>
-                                <input id="sw-edit-usr-correo" class="form-control" value="${u.correo}">
+                                <input id="sw-edit-usr-correo" type="email" class="form-control" value="${u.correo}">
                             </div>
                             <div class="col-md-6">
                                 <label class="fw-bold mb-1">Rol *</label>
                                 <select id="sw-edit-usr-rol" class="form-select">
                                     <option value="Administrador" ${u.rol === 'Administrador' ? 'selected' : ''}>Administrador</option>
                                     <option value="Delegado Territorial" ${u.rol === 'Delegado Territorial' ? 'selected' : ''}>Delegado Territorial</option>
-                                    <option value="Operador" ${u.rol === 'Operador' ? 'selected' : ''}>Operador</option>
-                                    <option value="Consultor" ${u.rol === 'Consultor' ? 'selected' : ''}>Consultor</option>
+                                    <option value="Funcionario" ${u.rol === 'Funcionario' ? 'selected' : ''}>Funcionario</option>
+                                    <option value="Coordinador" ${u.rol === 'Coordinador' ? 'selected' : ''}>Coordinador</option>
                                 </select>
                             </div>
                         </div>
                         <div class="row mb-2">
                             <div class="col-md-6">
-                                <label class="fw-bold mb-1">Delegación *</label>
+                                <label class="fw-bold mb-1">Delegación Única *</label>
                                 <select id="sw-edit-usr-del" class="form-select">
-                                    <option value="Sector Centro" ${u.delegacion === 'Sector Centro' ? 'selected' : ''}>Sector Centro</option>
-                                    <option value="Las Compañías" ${u.delegacion === 'Las Compañías' ? 'selected' : ''}>Las Compañías</option>
-                                    <option value="La Pampa" ${u.delegacion === 'La Pampa' ? 'selected' : ''}>La Pampa</option>
-                                    <option value="La Antena / La Florida" ${u.delegacion === 'La Antena / La Florida' ? 'selected' : ''}>La Antena / La Florida</option>
-                                    <option value="Avenida del Mar" ${u.delegacion === 'Avenida del Mar' ? 'selected' : ''}>Avenida del Mar</option>
-                                    <option value="Rural" ${u.delegacion === 'Rural' ? 'selected' : ''}>Rural</option>
+                                    ${opcionesDel}
                                 </select>
                             </div>
                             <div class="col-md-6">
@@ -366,11 +392,25 @@
                 confirmButtonColor: '#8B1E28',
                 confirmButtonText: 'Actualizar',
                 preConfirm: () => {
+                    const nombre = document.getElementById('sw-edit-usr-nombre').value.trim();
+                    const nick = document.getElementById('sw-edit-usr-nick').value.trim();
+                    const correo = document.getElementById('sw-edit-usr-correo').value.trim();
+
+                    if (!nombre || !nick || !correo) {
+                        Swal.showValidationMessage('Todos los campos son obligatorios.');
+                        return false;
+                    }
+
+                    if (!EMAIL_REGEX.test(correo)) {
+                        Swal.showValidationMessage('Ingresa un correo electrónico válido (ejemplo: usuario@dominio.cl).');
+                        return false;
+                    }
+
                     return {
                         rut: u.rut || '12345678-9',
-                        nombre_usuario: document.getElementById('sw-edit-usr-nick').value.trim(),
-                        nombre: document.getElementById('sw-edit-usr-nombre').value.trim(),
-                        correo: document.getElementById('sw-edit-usr-correo').value.trim(),
+                        nombre_usuario: nick,
+                        nombre: nombre,
+                        correo: correo,
                         rol: document.getElementById('sw-edit-usr-rol').value,
                         delegacion: document.getElementById('sw-edit-usr-del').value,
                         estado: document.getElementById('sw-edit-usr-est').value
@@ -378,15 +418,19 @@
                 }
             }).then(async (result) => {
                 if (result.isConfirmed) {
-                    await fetch(`${API}/usuarios/${id}`, {
+                    const res = await fetch(`${API}/usuarios/${id}`, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
-                    Swal.fire('¡Actualizado!', 'Usuario modificado.', 'success');
-                    cargarUsuariosBD();
-                    sincronizarSesionYNavbar();
+                    const json = await res.json();
+                    if (json.success) {
+                        Swal.fire('¡Actualizado!', 'Usuario modificado.', 'success');
+                        cargarUsuariosBD(paginaActual);
+                    } else {
+                        Swal.fire('Error', json.message, 'error');
+                    }
                 }
             });
         }
@@ -394,7 +438,7 @@
         async function eliminarUsuario(id) {
             Swal.fire({
                 title: '¿Eliminar usuario?',
-                text: 'Se borra de MySQL permanentemente.',
+                text: 'Se eliminará permanentemente.',
                 icon: 'warning',
                 showCancelButton: true,
                 confirmButtonColor: '#d33',
@@ -402,7 +446,7 @@
             }).then(async (res) => {
                 if (res.isConfirmed) {
                     await fetch(`${API}/usuarios/${id}`, { method: 'DELETE', credentials: 'include' });
-                    cargarUsuariosBD();
+                    cargarUsuariosBD(paginaActual);
                 }
             });
         }
@@ -418,17 +462,6 @@
             a.href = url;
             a.download = 'Usuarios_Sistema.csv';
             a.click();
-        }
-
-        async function cerrarSesion() {
-            try {
-                await fetch(`${API}/logout`, { method: 'POST', credentials: 'include' });
-            } catch (e) {
-                console.error(e);
-            }
-            localStorage.removeItem('sgr_user');
-            sessionStorage.removeItem('sgr_user');
-            window.location.href = 'index.html';
         }
     </script>
 </body>

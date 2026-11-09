@@ -13,18 +13,18 @@
 </head>
 <body class="min-vh-100" style="background-color: #f4f6f9;">
 
-    <!-- CONTENEDOR DEL NAVBAR CENTRALIZADO -->
+    <!-- NAVBAR CENTRALIZADO -->
     <div id="navbar-container"></div>
 
     <!-- Contenido Principal -->
     <div class="container mt-4 mb-5">
         <div class="row mb-4 align-items-center">
             <div class="col-md-7">
-                <h3 style="color: #8B1E28;">Listado de Atenciones Registradas</h3>
+                <h3 style="color: #8B1E28;" class="fw-bold">Listado de Atenciones Registradas</h3>
                 <p class="text-muted mb-0">Monitoreo de atención ciudadana y espacios públicos en La Serena.</p>
             </div>
             <div class="col-md-5 text-end d-flex justify-content-end gap-2">
-                <button class="btn btn-outline-secondary" onclick="cargarAtencionesBD()">
+                <button class="btn btn-outline-secondary" onclick="cargarAtencionesBD(1)">
                     🔄 Refrescar
                 </button>
                 <button class="btn text-white" style="background-color: #8B1E28;" onclick="abrirModalNuevaAtencion()">
@@ -55,6 +55,17 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- PIE DE PAGINACIÓN -->
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                <div class="text-muted small fw-bold" id="infoPaginacionAtenciones">
+                    Mostrando 0 a 0 de 0 registros
+                </div>
+                <nav aria-label="Navegación de páginas">
+                    <ul class="pagination pagination-sm m-0" id="paginadorAtenciones">
+                    </ul>
+                </nav>
+            </div>
         </div>
     </div>
 
@@ -66,17 +77,83 @@
             ? `${window.location.origin}/api` 
             : 'http://localhost:3000/api';
 
-        const opcionesSubTipo = {
-            'Social': ['Caja de Alimentos', 'Subsidio Agua Potable', 'Ficha Protección Social', 'Asistencia Familiar'],
-            'Territorial': ['Operativos de Limpieza', 'Reunión Junta de Vecinos', 'Jardines y Áreas Verdes'],
-            'Operativa': ['Reparación Luminarias', 'Bacheo de Calles', 'Retiro de Escombros', 'Fumigación']
-        };
+        let listaAtenciones = [];
+        let paginaActual = 1;
+        const limitePorPagina = 5;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            cargarAtencionesBD();
+        let tiposGlobales = [];
+        let subTiposGlobales = [];
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            fetch('navbar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('navbar-container').innerHTML = html;
+                    marcarBotonActivo();
+                    sincronizarSesionYNavbar();
+                });
+
+            cargarAtencionesBD(1);
+            await cargarCatalogos();
         });
 
-        async function cargarAtencionesBD() {
+        function marcarBotonActivo() {
+            let pag = window.location.pathname.split("/").pop();
+            if (!pag || pag === '') pag = 'dashboard.html';
+
+            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
+            enlaces.forEach(enlace => {
+                if (enlace.getAttribute('href') === pag || enlace.getAttribute('href') === 'gestion-territorial.html') {
+                    enlace.classList.add('activo-fijo');
+                } else {
+                    enlace.classList.remove('activo-fijo');
+                }
+            });
+        }
+
+        async function sincronizarSesionYNavbar() {
+            try {
+                const response = await fetch(`${API}/sesion-actual?t=${new Date().getTime()}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.usuario) {
+                        const usr = data.usuario;
+                        localStorage.setItem('sgr_user', JSON.stringify(usr));
+
+                        const elNombre = document.getElementById('usrHeaderNombre');
+                        const elRol = document.getElementById('usrHeaderRol');
+                        if (elNombre) elNombre.textContent = usr.nombre || usr.nombre_usuario;
+                        if (elRol) elRol.textContent = usr.rol;
+                    }
+                }
+            } catch (error) {
+                console.error('Error al sincronizar sesión:', error);
+            }
+        }
+
+        async function cargarCatalogos() {
+            try {
+                const [rTipos, rSubs] = await Promise.all([
+                    fetch(`${API}/tipos-atencion`, { credentials: 'include' }),
+                    fetch(`${API}/sub-atenciones`, { credentials: 'include' })
+                ]);
+                const jTipos = await rTipos.json();
+                const jSubs = await rSubs.json();
+
+                if (jTipos.success) tiposGlobales = jTipos.datos.filter(t => t.estado === 'ACTIVO');
+                if (jSubs.success) subTiposGlobales = jSubs.datos.filter(s => s.estado === 'ACTIVO');
+            } catch (e) {
+                console.error("Error al cargar catálogos:", e);
+            }
+        }
+
+        async function cargarAtencionesBD(pagina = 1) {
+            paginaActual = pagina;
             const tbody = document.getElementById('tablaAtencionesBody');
             tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-3">Actualizando datos...</td></tr>';
             
@@ -84,38 +161,88 @@
                 const response = await fetch(`${API}/atenciones`, { credentials: 'include' });
                 const json = await response.json();
                 
-                tbody.innerHTML = '';
-                
                 if (json.success) {
-                    const data = json.datos;
+                    listaAtenciones = json.datos;
                     
-                    if (!data || data.length === 0) {
-                        tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No hay atenciones registradas en la base de datos.</td></tr>';
-                        return;
-                    }
+                    const totalRegistros = listaAtenciones.length;
+                    const totalPaginas = Math.ceil(totalRegistros / limitePorPagina) || 1;
+                    
+                    const inicio = (paginaActual - 1) * limitePorPagina;
+                    const fin = inicio + limitePorPagina;
+                    const atencionesPagina = listaAtenciones.slice(inicio, fin);
 
-                    data.forEach(atencion => {
-                        const tr = document.createElement('tr');
-                        tr.innerHTML = `
-                            <td><b>#${atencion.id_atencion}</b></td>
-                            <td>${atencion.rut || 'S/R'}</td>
-                            <td>${atencion.solicitante || 'Sin Nombre'}</td>
-                            <td><strong>${atencion.tipo_atencion || ''}</strong><br><small class="text-muted">${atencion.sub_atencion || ''}</small></td>
-                            <td>${atencion.delegacion || ''}</td>
-                            <td>${atencion.usuario_responsable || 'Sistema'}</td>
-                            <td>${atencion.fecha_registro || 'N/A'}</td>
-                            <td>
-                                <button class="btn btn-sm btn-outline-secondary" onclick="verDetalle(${atencion.id_atencion}, '${atencion.descripcion || ''}')">Ver Detalle</button>
-                            </td>
-                        `;
-                        tbody.appendChild(tr);
-                    });
+                    renderTablaAtenciones(atencionesPagina);
+                    renderizarPaginador(totalRegistros, totalPaginas, totalRegistros > 0 ? inicio + 1 : 0, Math.min(fin, totalRegistros));
                 } else {
                     tbody.innerHTML = `<tr><td colspan="8" class="text-center text-danger py-4 fw-bold">Error: ${json.message}</td></tr>`;
                 }
             } catch (error) {
-                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4 fw-bold">Error al conectar con la base de datos. Verifica que Node.js esté encendido.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-danger py-4 fw-bold">Error al conectar con la base de datos. Verifica Node.js.</td></tr>';
             }
+        }
+
+        function renderTablaAtenciones(datos) {
+            const tbody = document.getElementById('tablaAtencionesBody');
+            tbody.innerHTML = '';
+
+            if (!datos || datos.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="8" class="text-center text-muted py-4">No hay atenciones registradas en la base de datos.</td></tr>';
+                return;
+            }
+
+            datos.forEach(atencion => {
+                const tr = document.createElement('tr');
+                tr.innerHTML = `
+                    <td><b>#${atencion.id_atencion}</b></td>
+                    <td>${atencion.rut || 'S/R'}</td>
+                    <td>${atencion.solicitante || 'Sin Nombre'}</td>
+                    <td><strong>${atencion.tipo_atencion || ''}</strong><br><small class="text-muted">${atencion.sub_atencion || ''}</small></td>
+                    <td>${atencion.delegacion || ''}</td>
+                    <td>${atencion.usuario_responsable || 'Sistema'}</td>
+                    <td>${atencion.fecha_registro ? new Date(atencion.fecha_registro).toLocaleDateString('es-CL') : 'N/A'}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline-warning me-1" onclick="modalEditarAtencion(${atencion.id_atencion})">Editar</button>
+                        <button class="btn btn-sm btn-outline-danger me-1" onclick="eliminarAtencion(${atencion.id_atencion})">Eliminar</button>
+                        <button class="btn btn-sm btn-outline-secondary" onclick="verDetalle(${atencion.id_atencion}, '${atencion.descripcion || ''}')">Detalle</button>
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function renderizarPaginador(totalRegistros, totalPaginas, desde, hasta) {
+            const infoText = document.getElementById('infoPaginacionAtenciones');
+            const ulPaginador = document.getElementById('paginadorAtenciones');
+
+            if (totalRegistros === 0) {
+                infoText.textContent = 'Mostrando 0 a 0 de 0 registros';
+                ulPaginador.innerHTML = '';
+                return;
+            } else {
+                infoText.textContent = `Mostrando ${desde} a ${hasta} de ${totalRegistros} registros`;
+            }
+
+            ulPaginador.innerHTML = '';
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginaActual === 1 ? 'disabled' : ''}">
+                    <button class="page-link" onclick="cargarAtencionesBD(${paginaActual - 1})">Anterior</button>
+                </li>
+            `;
+
+            for (let i = 1; i <= totalPaginas; i++) {
+                ulPaginador.innerHTML += `
+                    <li class="page-item ${i === paginaActual ? 'active' : ''}">
+                        <button class="page-link" ${i === paginaActual ? 'style="background-color: #8B1E28; border-color: #8B1E28;"' : ''} onclick="cargarAtencionesBD(${i})">${i}</button>
+                    </li>
+                `;
+            }
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginaActual === totalPaginas ? 'disabled' : ''}">
+                    <button class="page-link" onclick="cargarAtencionesBD(${paginaActual + 1})">Siguiente</button>
+                </li>
+            `;
         }
 
         function formatearRUT(rut) {
@@ -127,25 +254,28 @@
             return `${cuerpo}-${dv}`;
         }
 
-        function actualizarSubTipos() {
+        function actualizarSubTiposModal() {
             const tipo = document.getElementById('sw-at-tipo').value;
             const selectSub = document.getElementById('sw-at-sub');
             selectSub.innerHTML = '';
             
-            if (opcionesSubTipo[tipo]) {
-                opcionesSubTipo[tipo].forEach(sub => {
-                    selectSub.innerHTML += `<option value="${sub}">${sub}</option>`;
-                });
-            }
+            const subs = subTiposGlobales.filter(s => s.tipo_asociado === tipo);
+            subs.forEach(sub => {
+                selectSub.innerHTML += `<option value="${sub.nombre}">${sub.nombre}</option>`;
+            });
         }
 
-        function abrirModalNuevaAtencion() {
+        async function abrirModalNuevaAtencion() {
+            if (tiposGlobales.length === 0) await cargarCatalogos();
+
             const sessionUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user')) || { 
                 nombre: 'Usuario Operador', 
                 delegacion: 'Sector Centro' 
             };
 
             const delegacionAsignada = sessionUser.delegacion || 'Sector Centro';
+
+            let opcionesTiposHTML = tiposGlobales.map(t => `<option value="${t.nombre}">${t.nombre}</option>`).join('');
 
             Swal.fire({
                 title: 'Ingreso de Atención',
@@ -169,10 +299,8 @@
                             </div>
                             <div class="col-md-6">
                                 <label class="fw-bold mb-1">Tipo de Atención *</label>
-                                <select id="sw-at-tipo" class="form-select" onchange="actualizarSubTipos()">
-                                    <option value="Social">Social</option>
-                                    <option value="Territorial">Territorial</option>
-                                    <option value="Operativa">Operativa</option>
+                                <select id="sw-at-tipo" class="form-select" onchange="actualizarSubTiposModal()">
+                                    ${opcionesTiposHTML}
                                 </select>
                             </div>
                         </div>
@@ -199,7 +327,7 @@
                 confirmButtonText: 'Guardar atención',
                 cancelButtonText: 'Cancelar',
                 didOpen: () => {
-                    actualizarSubTipos();
+                    actualizarSubTiposModal();
                 },
                 preConfirm: () => {
                     let rutInput = document.getElementById('sw-at-rut').value.trim();
@@ -248,13 +376,153 @@
                         });
                         const json = await response.json();
                         if (json.success) {
-                            Swal.fire('¡Registrado!', 'La atención ha sido guardada en MySQL.', 'success');
-                            cargarAtencionesBD();
+                            Swal.fire('¡Registrado!', 'La atención ha sido guardada en la base de datos.', 'success');
+                            cargarAtencionesBD(paginaActual);
                         } else {
                             Swal.fire('Error MySQL', json.message || 'No se pudo guardar la atención.', 'error');
                         }
                     } catch (e) {
-                        Swal.fire('Error', 'No se pudo conectar con la API de Node.js.', 'error');
+                        Swal.fire('Error', 'No se pudo conectar con el servidor backend.', 'error');
+                    }
+                }
+            });
+        }
+
+        async function modalEditarAtencion(id) {
+            const at = listaAtenciones.find(item => item.id_atencion === id);
+            if (!at) return;
+
+            if (tiposGlobales.length === 0) await cargarCatalogos();
+
+            let opcionesTiposHTML = tiposGlobales.map(t => 
+                `<option value="${t.nombre}" ${t.nombre === at.tipo_atencion ? 'selected' : ''}>${t.nombre}</option>`
+            ).join('');
+
+            Swal.fire({
+                title: `Editar Atención #${id}`,
+                html: `
+                    <div class="text-start" style="font-size: 0.9rem;">
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">RUT Vecino *</label>
+                                <input id="sw-edit-at-rut" class="form-control" value="${at.rut || ''}" onblur="this.value = formatearRUT(this.value)">
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Nombre Solicitante</label>
+                                <input id="sw-edit-at-solicitante" class="form-control" value="${at.solicitante || ''}">
+                            </div>
+                        </div>
+
+                        <div class="row mb-2">
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Delegación</label>
+                                <input id="sw-edit-at-del" class="form-control bg-light" value="${at.delegacion || ''}" readonly>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="fw-bold mb-1">Tipo de Atención *</label>
+                                <select id="sw-edit-at-tipo" class="form-select" onchange="actualizarSubTiposModalEdit()">
+                                    ${opcionesTiposHTML}
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Sub Atención *</label>
+                            <select id="sw-edit-at-sub" class="form-select">
+                            </select>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="fw-bold mb-1">Descripción de la atención *</label>
+                            <textarea id="sw-edit-at-desc" class="form-control" rows="3">${at.descripcion || ''}</textarea>
+                        </div>
+                    </div>
+                `,
+                width: '650px',
+                showCancelButton: true,
+                confirmButtonColor: '#8B1E28',
+                confirmButtonText: 'Actualizar',
+                cancelButtonText: 'Cancelar',
+                didOpen: () => {
+                    actualizarSubTiposModalEdit(at.sub_atencion);
+                },
+                preConfirm: () => {
+                    let rutInput = document.getElementById('sw-edit-at-rut').value.trim();
+                    let solicitante = document.getElementById('sw-edit-at-solicitante').value.trim();
+                    const tipo = document.getElementById('sw-edit-at-tipo').value;
+                    const sub = document.getElementById('sw-edit-at-sub').value;
+                    const descripcion = document.getElementById('sw-edit-at-desc').value.trim();
+
+                    rutInput = formatearRUT(rutInput);
+                    const regexRut = /^[0-9]{7,8}-[0-9kK]{1}$/;
+                    if (!rutInput || !regexRut.test(rutInput)) {
+                        Swal.showValidationMessage('Ingrese un RUT válido de vecino.');
+                        return false;
+                    }
+                    if (!descripcion) {
+                        Swal.showValidationMessage('La descripción es obligatoria.');
+                        return false;
+                    }
+
+                    return {
+                        rut: rutInput,
+                        solicitante: solicitante || 'Vecino No Registrado',
+                        delegacion: at.delegacion,
+                        usuario_responsable: at.usuario_responsable,
+                        tipo_atencion: tipo,
+                        sub_atencion: sub,
+                        descripcion: descripcion,
+                        estado: at.estado || 'PENDIENTE'
+                    };
+                }
+            }).then(async (result) => {
+                if (result.isConfirmed) {
+                    const res = await fetch(`${API}/atenciones/${id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        credentials: 'include',
+                        body: JSON.stringify(result.value)
+                    });
+                    const json = await res.json();
+                    if (json.success) {
+                        Swal.fire('¡Actualizado!', 'Atención modificada correctamente.', 'success');
+                        cargarAtencionesBD(paginaActual);
+                    } else {
+                        Swal.fire('Error', json.message, 'error');
+                    }
+                }
+            });
+        }
+
+        function actualizarSubTiposModalEdit(subSeleccionada = '') {
+            const tipo = document.getElementById('sw-edit-at-tipo').value;
+            const selectSub = document.getElementById('sw-edit-at-sub');
+            selectSub.innerHTML = '';
+            
+            const subs = subTiposGlobales.filter(s => s.tipo_asociado === tipo);
+            subs.forEach(sub => {
+                const selected = (sub.nombre === subSeleccionada) ? 'selected' : '';
+                selectSub.innerHTML += `<option value="${sub.nombre}" ${selected}>${sub.nombre}</option>`;
+            });
+        }
+
+        async function eliminarAtencion(id) {
+            Swal.fire({
+                title: '¿Eliminar Atención?',
+                text: 'Esta acción no se puede deshacer.',
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonColor: '#d33',
+                confirmButtonText: 'Eliminar'
+            }).then(async (res) => {
+                if (res.isConfirmed) {
+                    const response = await fetch(`${API}/atenciones/${id}`, { method: 'DELETE', credentials: 'include' });
+                    const json = await response.json();
+                    if (json.success) {
+                        Swal.fire('¡Eliminado!', 'Atención removida.', 'success');
+                        cargarAtencionesBD(paginaActual);
+                    } else {
+                        Swal.fire('Error', json.message, 'error');
                     }
                 }
             });

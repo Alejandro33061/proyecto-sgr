@@ -12,23 +12,26 @@
 
     <div class="card glass-card p-4" style="width: 100%; max-width: 420px;">
         <div class="text-center mb-4">
-            <h3 style="color: #8B1E28;" class="fw-bold">I. MUNICIPALIDAD DE LA SERENA</h3>
-            <h6 class="text-muted">Gestión Territorial SGR</h6>
+            <h4 style="color: #8B1E28;" class="fw-bold">I. MUNICIPALIDAD DE LA SERENA</h4>
+            <p class="text-muted small">Sistema de Gestión de Requerimientos (SGR)</p>
         </div>
-        
-        <form id="loginForm" novalidate>
+
+        <form id="formLogin" novalidate>
             <div class="mb-3">
                 <label class="form-label fw-bold">Usuario o Correo *</label>
-                <input type="text" class="form-control" id="userInput" placeholder="••••••••" required>
+                <input type="text" class="form-control" id="loginUsuario" placeholder="admin@laserena.cl" required>
             </div>
+
             <div class="mb-3">
                 <label class="form-label fw-bold">Contraseña *</label>
-                <input type="password" class="form-control" id="passwordInput" placeholder="••••••••" required>
+                <input type="password" class="form-control" id="loginPassword" placeholder="******" required>
             </div>
-            <div class="text-end mb-4">
-                <a href="recuperar.html" class="text-decoration-none small" style="color: #8B1E28;">¿Olvidaste tu contraseña?</a>
+
+            <button type="submit" class="btn btn-muni w-100 py-2 mb-3">Iniciar Sesión</button>
+
+            <div class="text-center">
+                <a href="recuperar.html" class="text-decoration-none small" style="color: #8B1E28;">¿Olvidó su contraseña?</a>
             </div>
-            <button type="submit" class="btn btn-muni w-100 py-2 fs-6">Acceder al Sistema</button>
         </form>
     </div>
 
@@ -39,15 +42,15 @@
             ? `${window.location.origin}/api` 
             : 'http://localhost:3000/api';
 
-        document.getElementById('loginForm').addEventListener('submit', async function(event) {
-            event.preventDefault();
-            const usuario = document.getElementById('userInput').value.trim();
-            const password = document.getElementById('passwordInput').value;
+        document.getElementById('formLogin').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            const usuario = document.getElementById('loginUsuario').value.trim();
+            const password = document.getElementById('loginPassword').value.trim();
 
             if (!usuario || !password) {
                 Swal.fire({
-                    title: 'Campos incompletos',
-                    text: 'Debe ingresar su usuario/correo y contraseña.',
+                    title: 'Campos requeridos',
+                    text: 'Ingrese su usuario y contraseña.',
                     icon: 'warning',
                     confirmButtonColor: '#8B1E28'
                 });
@@ -65,30 +68,51 @@
                 const data = await response.json();
 
                 if (data.success) {
-                    localStorage.setItem('sgr_user', JSON.stringify(data.usuario));
-                    sessionStorage.setItem('sgr_user', JSON.stringify(data.usuario));
+                    // Eval 3: Detectar obligatoriedad de cambiar contraseña provisoria
+                    if (data.requirePasswordChange) {
+                        Swal.fire({
+                            title: 'Primer Ingreso Detectado',
+                            text: 'Ha ingresado con una contraseña provisoria. Por motivos de seguridad, debe crear una nueva contraseña.',
+                            icon: 'info',
+                            input: 'password',
+                            inputPlaceholder: 'Ingrese su nueva contraseña',
+                            inputValidator: (value) => {
+                                if (!value || value.length < 8) {
+                                    return 'La contraseña debe tener al menos 8 caracteres.';
+                                }
+                            },
+                            confirmButtonColor: '#8B1E28',
+                            confirmButtonText: 'Actualizar Contraseña'
+                        }).then(async (result) => {
+                            if (result.isConfirmed) {
+                                const respCambio = await fetch(`${API}/cambiar-clave-primer-ingreso`, {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ correo: data.correo, nuevaClave: result.value })
+                                });
+                                const dataCambio = await respCambio.json();
+                                if (dataCambio.success) {
+                                    Swal.fire('¡Éxito!', 'Contraseña actualizada. Inicie sesión nuevamente.', 'success');
+                                }
+                            }
+                        });
+                        return;
+                    }
 
-                    Swal.fire({
-                        title: `¡Bienvenido, ${data.usuario.nombre}!`,
-                        text: `Rol: ${data.usuario.rol} | Delegación: ${data.usuario.delegacion}`,
-                        icon: 'success',
-                        timer: 1400,
-                        showConfirmButton: false
-                    }).then(() => {
-                        window.location.href = 'dashboard.html';
-                    });
+                    localStorage.setItem('sgr_user', JSON.stringify(data.usuario));
+                    window.location.href = 'dashboard.html';
                 } else {
                     Swal.fire({
-                        title: 'Acceso Denegado',
+                        title: 'Error de Autenticación',
                         text: data.message,
                         icon: 'error',
                         confirmButtonColor: '#8B1E28'
                     });
                 }
-            } catch (error) {
+            } catch (err) {
                 Swal.fire({
                     title: 'Error de Conexión',
-                    text: 'No se pudo conectar con el servidor Backend. Verifique que node server.js esté iniciado.',
+                    text: 'No se pudo conectar con el servidor backend.',
                     icon: 'error',
                     confirmButtonColor: '#8B1E28'
                 });

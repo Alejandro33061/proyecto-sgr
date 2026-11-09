@@ -17,17 +17,17 @@
         <div class="d-flex justify-content-between align-items-center mb-3">
             <div>
                 <h3 style="color: #8B1E28;" class="m-0 fw-bold">Tipos de Atención</h3>
-                <p class="text-muted m-0">Catálogo general de categorías de atención municipal.</p>
+                <p class="text-muted m-0">Catálogo general de categorías de atención municipal ligadas a delegaciones.</p>
             </div>
         </div>
 
         <div class="card p-3 shadow-sm border-0">
             <div class="row g-2 align-items-center mb-3">
                 <div class="col-md-5">
-                    <input type="text" id="busquedaTipo" class="form-control" placeholder="Buscar por nombre, código u otro campo..." oninput="filtrarTipos()">
+                    <input type="text" id="busquedaTipo" class="form-control" placeholder="Buscar por nombre, código u otro campo..." oninput="filtrarTipos(1)">
                 </div>
                 <div class="col-md-3">
-                    <select id="filtroEstadoTipo" class="form-select" onchange="filtrarTipos()">
+                    <select id="filtroEstadoTipo" class="form-select" onchange="filtrarTipos(1)">
                         <option value="">Todos los estados</option>
                         <option value="ACTIVO">ACTIVO</option>
                         <option value="INACTIVO">INACTIVO</option>
@@ -52,14 +52,25 @@
                             <th>Código</th>
                             <th>Nombre</th>
                             <th>Descripción</th>
+                            <th>Delegación Ligada</th>
                             <th>Estado</th>
                             <th>Acciones</th>
                         </tr>
                     </thead>
                     <tbody id="tbodyTipos">
-                        <tr><td colspan="5" class="text-center">Cargando tipos de atención...</td></tr>
+                        <tr><td colspan="6" class="text-center">Cargando tipos de atención...</td></tr>
                     </tbody>
                 </table>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                <div class="text-muted small fw-bold" id="infoPaginacionTipos">
+                    Mostrando 0 a 0 de 0 registros
+                </div>
+                <nav aria-label="Navegación de páginas">
+                    <ul class="pagination pagination-sm m-0" id="paginadorTipos">
+                    </ul>
+                </nav>
             </div>
         </div>
     </div>
@@ -73,20 +84,107 @@
             : 'http://localhost:3000/api';
 
         let listaTipos = [];
+        let listaDelegacionesCat = [];
+        let paginaActual = 1;
+        const limitePorPagina = 5;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            cargarTiposBD();
+        document.addEventListener('DOMContentLoaded', async () => {
+            fetch('navbar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('navbar-container').innerHTML = html;
+                    marcarBotonActivo();
+                    sincronizarSesionYNavbar();
+                });
+
+            await cargarDelegacionesCatalogo();
+            cargarTiposBD(1);
         });
 
-        async function cargarTiposBD() {
+        function marcarBotonActivo() {
+            let pag = window.location.pathname.split("/").pop();
+            if (!pag || pag === '') pag = 'tipos-atencion.html';
+
+            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
+            enlaces.forEach(enlace => {
+                if (enlace.getAttribute('href') === pag) {
+                    enlace.classList.add('activo-fijo');
+                } else {
+                    enlace.classList.remove('activo-fijo');
+                }
+            });
+        }
+
+        async function sincronizarSesionYNavbar() {
+            try {
+                const response = await fetch(`${API}/sesion-actual?t=${new Date().getTime()}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.usuario) {
+                        const usr = data.usuario;
+                        localStorage.setItem('sgr_user', JSON.stringify(usr));
+
+                        const elNombre = document.getElementById('usrHeaderNombre');
+                        const elRol = document.getElementById('usrHeaderRol');
+                        if (elNombre) elNombre.textContent = usr.nombre || usr.nombre_usuario;
+                        if (elRol) elRol.textContent = usr.rol;
+                    }
+                }
+            } catch (error) {
+                console.error('Error al sincronizar sesión:', error);
+            }
+        }
+
+        async function cargarDelegacionesCatalogo() {
+            try {
+                const res = await fetch(`${API}/delegaciones?limit=100`, { credentials: 'include' });
+                const json = await res.json();
+                if (json.success) listaDelegacionesCat = json.datos;
+            } catch (e) { console.error(e); }
+        }
+
+        async function cargarTiposBD(pagina = 1) {
+            paginaActual = pagina;
             try {
                 const response = await fetch(`${API}/tipos-atencion`, { credentials: 'include' });
                 const json = await response.json();
                 if (json.success) {
-                    listaTipos = json.datos.sort((a, b) => (a.id_tipo || a.id_tipo_atencion) - (b.id_tipo || b.id_tipo_atencion));
-                    renderTablaTipos(listaTipos);
+                    // Ordenamiento por el número del código (TAT-01, TAT-02, etc.)
+                    listaTipos = json.datos.sort((a, b) => {
+                        const numA = parseInt((a.codigo ? a.codigo.match(/\d+/) : [0]) || [0], 10);
+                        const numB = parseInt((b.codigo ? b.codigo.match(/\d+/) : [0]) || [0], 10);
+                        return numA - numB;
+                    });
+                    filtrarTipos(paginaActual);
                 }
             } catch (error) { console.error(error); }
+        }
+
+        function filtrarTipos(pagina = 1) {
+            paginaActual = pagina;
+            const texto = document.getElementById('busquedaTipo').value.toLowerCase();
+            const estado = document.getElementById('filtroEstadoTipo').value;
+
+            const filtrados = listaTipos.filter(t => {
+                const coincideTexto = t.nombre.toLowerCase().includes(texto) || t.codigo.toLowerCase().includes(texto);
+                const coincideEstado = estado === '' || t.estado === estado;
+                return coincideTexto && coincideEstado;
+            });
+
+            const totalRegistros = filtrados.length;
+            const totalPaginas = Math.ceil(totalRegistros / limitePorPagina) || 1;
+            
+            const inicio = (paginaActual - 1) * limitePorPagina;
+            const fin = inicio + limitePorPagina;
+            const datosPagina = filtrados.slice(inicio, fin);
+
+            renderTablaTipos(datosPagina);
+            renderizarPaginador(totalRegistros, totalPaginas, totalRegistros > 0 ? inicio + 1 : 0, Math.min(fin, totalRegistros));
         }
 
         function renderTablaTipos(datos) {
@@ -94,7 +192,7 @@
             tbody.innerHTML = '';
 
             if (!datos || datos.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="5" class="text-center text-muted py-3">No hay tipos registrados.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="text-center text-muted py-3">No hay tipos registrados.</td></tr>';
                 return;
             }
 
@@ -105,6 +203,7 @@
                     <td><strong>${t.codigo}</strong></td>
                     <td>${t.nombre}</td>
                     <td>${t.descripcion || 'Sin descripción'}</td>
+                    <td><span class="badge bg-secondary">${t.delegacion || 'Todas (Comunal)'}</span></td>
                     <td><span class="badge ${t.estado === 'ACTIVO' ? 'bg-success' : 'bg-secondary'}">${t.estado}</span></td>
                     <td>
                         <button class="btn btn-sm btn-outline-warning me-1" onclick="modalEditarTipo(${idReal})">Editar</button>
@@ -115,31 +214,64 @@
             });
         }
 
-        function filtrarTipos() {
-            const texto = document.getElementById('busquedaTipo').value.toLowerCase();
-            const estado = document.getElementById('filtroEstadoTipo').value;
+        function renderizarPaginador(totalRegistros, totalPaginas, desde, hasta) {
+            const infoText = document.getElementById('infoPaginacionTipos');
+            const ulPaginador = document.getElementById('paginadorTipos');
 
-            const filtrados = listaTipos.filter(t => {
-                const coincideTexto = t.nombre.toLowerCase().includes(texto) || t.codigo.toLowerCase().includes(texto);
-                const coincideEstado = estado === '' || t.estado === estado;
-                return coincideTexto && coincideEstado;
-            });
+            if (totalRegistros === 0) {
+                infoText.textContent = 'Mostrando 0 a 0 de 0 registros';
+                ulPaginador.innerHTML = '';
+                return;
+            } else {
+                infoText.textContent = `Mostrando ${desde} a ${hasta} de ${totalRegistros} registros`;
+            }
 
-            renderTablaTipos(filtrados);
+            ulPaginador.innerHTML = '';
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginaActual === 1 ? 'disabled' : ''}">
+                    <button class="page-link" onclick="filtrarTipos(${paginaActual - 1})">Anterior</button>
+                </li>
+            `;
+
+            for (let i = 1; i <= totalPaginas; i++) {
+                ulPaginador.innerHTML += `
+                    <li class="page-item ${i === paginaActual ? 'active' : ''}">
+                        <button class="page-link" ${i === paginaActual ? 'style="background-color: #8B1E28; border-color: #8B1E28;"' : ''} onclick="filtrarTipos(${i})">${i}</button>
+                    </li>
+                `;
+            }
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginaActual === totalPaginas ? 'disabled' : ''}">
+                    <button class="page-link" onclick="filtrarTipos(${paginaActual + 1})">Siguiente</button>
+                </li>
+            `;
         }
 
         function modalNuevoTipo() {
+            let opcionesDel = `<option value="Todas (Comunal)">Todas (Comunal)</option>`;
+            listaDelegacionesCat.forEach(d => {
+                opcionesDel += `<option value="${d.nombre}">${d.nombre}</option>`;
+            });
+
             Swal.fire({
                 title: 'Nuevo Tipo de Atención',
                 html: `
                     <div class="text-start" style="font-size: 0.9rem;">
                         <div class="mb-2">
-                            <label class="fw-bold mb-1">Código *</label>
-                            <input id="sw-ta-codigo" class="form-control" placeholder="Ej: TA001">
+                            <label class="fw-bold mb-1">Código (Opcional - Autogenerado)</label>
+                            <input id="sw-ta-codigo" class="form-control" placeholder="Ej: TAT-04 (Dejar vacío para correlativo automático)">
                         </div>
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Nombre *</label>
-                            <input id="sw-ta-nombre" class="form-control" placeholder="Ej: Social, Salud, Educación">
+                            <input id="sw-ta-nombre" class="form-control" placeholder="Ej: Asistencia Social, Obras">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Delegación *</label>
+                            <select id="sw-ta-del" class="form-select">
+                                ${opcionesDel}
+                            </select>
                         </div>
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Descripción</label>
@@ -158,29 +290,35 @@
                 confirmButtonColor: '#8B1E28',
                 confirmButtonText: 'Guardar',
                 preConfirm: () => {
-                    const codigo = document.getElementById('sw-ta-codigo').value.trim();
+                    const codigoInput = document.getElementById('sw-ta-codigo').value.trim();
                     const nombre = document.getElementById('sw-ta-nombre').value.trim();
-                    if (!codigo || !nombre) {
-                        Swal.showValidationMessage('El Código y Nombre son obligatorios.');
+                    if (!nombre) {
+                        Swal.showValidationMessage('El Nombre es obligatorio.');
                         return false;
                     }
                     return {
-                        codigo,
+                        codigo: codigoInput,
                         nombre,
+                        delegacion: document.getElementById('sw-ta-del').value,
                         descripcion: document.getElementById('sw-ta-desc').value.trim() || 'Sin descripción',
                         estado: document.getElementById('sw-ta-est').value
                     };
                 }
             }).then(async (result) => {
                 if (result.isConfirmed) {
-                    await fetch(`${API}/tipos-atencion`, {
+                    const res = await fetch(`${API}/tipos-atencion`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
-                    Swal.fire('¡Guardado!', 'Tipo de atención agregado.', 'success');
-                    cargarTiposBD();
+                    const json = await res.json();
+                    if (json.success) {
+                        Swal.fire('¡Guardado!', `Tipo de atención agregado (${json.codigo}).`, 'success');
+                        cargarTiposBD(paginaActual);
+                    } else {
+                        Swal.fire('Error', json.message, 'error');
+                    }
                 }
             });
         }
@@ -189,8 +327,13 @@
             const t = listaTipos.find(item => (item.id_tipo || item.id_tipo_atencion) === id);
             if (!t) return;
 
+            let opcionesDel = `<option value="Todas (Comunal)" ${(!t.delegacion || t.delegacion.includes('Todas')) ? 'selected' : ''}>Todas (Comunal)</option>`;
+            listaDelegacionesCat.forEach(d => {
+                opcionesDel += `<option value="${d.nombre}" ${t.delegacion === d.nombre ? 'selected' : ''}>${d.nombre}</option>`;
+            });
+
             Swal.fire({
-                title: `Editar Tipo de Atención`,
+                title: `Editar Tipo de Atención #${id}`,
                 html: `
                     <div class="text-start" style="font-size: 0.9rem;">
                         <div class="mb-2">
@@ -200,6 +343,12 @@
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Nombre *</label>
                             <input id="sw-edit-ta-nombre" class="form-control" value="${t.nombre}">
+                        </div>
+                        <div class="mb-2">
+                            <label class="fw-bold mb-1">Delegación *</label>
+                            <select id="sw-edit-ta-del" class="form-select">
+                                ${opcionesDel}
+                            </select>
                         </div>
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Descripción</label>
@@ -227,6 +376,7 @@
                     return {
                         codigo,
                         nombre,
+                        delegacion: document.getElementById('sw-edit-ta-del').value,
                         descripcion: document.getElementById('sw-edit-ta-desc').value.trim(),
                         estado: document.getElementById('sw-edit-ta-est').value
                     };
@@ -242,7 +392,7 @@
                     const json = await res.json();
                     if (json.success) {
                         Swal.fire('¡Actualizado!', 'Tipo modificado correctamente.', 'success');
-                        cargarTiposBD();
+                        cargarTiposBD(paginaActual);
                     } else {
                         Swal.fire('Error', json.message, 'error');
                     }
@@ -264,7 +414,7 @@
                     const json = await response.json();
                     if (json.success) {
                         Swal.fire('¡Eliminado!', 'Registro removido.', 'success');
-                        cargarTiposBD();
+                        cargarTiposBD(paginaActual);
                     } else {
                         Swal.fire('Operación Bloqueada', json.message, 'error');
                     }
@@ -273,9 +423,9 @@
         }
 
         function exportarExcelTipos() {
-            let csv = 'Codigo,Nombre,Descripcion,Estado\n';
+            let csv = 'Codigo,Nombre,Delegacion,Descripcion,Estado\n';
             listaTipos.forEach(t => {
-                csv += `"${t.codigo}","${t.nombre}","${t.descripcion || ''}","${t.estado}"\n`;
+                csv += `"${t.codigo}","${t.nombre}","${t.delegacion || 'Todas'}","${t.descripcion || ''}","${t.estado}"\n`;
             });
             const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
             const url = URL.createObjectURL(blob);

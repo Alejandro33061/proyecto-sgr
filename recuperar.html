@@ -8,61 +8,62 @@
     <link href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css" rel="stylesheet">
     <link href="style.css" rel="stylesheet">
 </head>
-<body class="d-flex align-items-center justify-content-center" style="min-height: 100vh;">
+<body class="d-flex align-items-center justify-content-center min-vh-100" style="background-color: #f4f6f9;">
 
-    <div class="card glass-card p-4" style="width: 100%; max-width: 480px;">
-        <div class="text-center mb-3">
-            <h4 style="color: #8B1E28;" class="fw-bold">I. MUNICIPALIDAD DE LA SERENA</h4>
-            <h6 class="text-muted" id="flowTitle">Paso 1: Solicitud de Código</h6>
+    <div class="card p-4 shadow-lg border-0" style="max-width: 420px; width: 100%; border-radius: 12px;">
+        <div class="text-center mb-4">
+            <h4 style="color: #8B1E28;" class="fw-bold">Muni La Serena</h4>
+            <p class="text-muted small m-0">Sistema SGR - Recuperación de Acceso</p>
         </div>
 
-        <!-- PASO 1: Solicitud por Usuario o Correo -->
+        <!-- PASO 1: INGRESAR CORREO O USUARIO -->
         <div id="step1">
-            <form id="formStep1" novalidate>
+            <p class="text-muted small">Ingrese su correo electrónico registrado para enviar un código de verificación.</p>
+            <form id="formStep1" onsubmit="solicitarCodigo(event)">
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Usuario o Correo Institucional *</label>
-                    <input type="text" class="form-control" id="reqEmail" placeholder="usuario@laserena.cl" required>
-                    <div class="invalid-feedback">Ingrese un usuario o correo registrado.</div>
+                    <label class="form-label fw-bold">Correo electrónico</label>
+                    <input type="text" id="inputCorreo" class="form-control" placeholder="ejemplo@laserena.cl" required>
                 </div>
-                <button type="submit" class="btn btn-muni w-100 py-2 mb-3">Enviar Código por Correo</button>
+                <button type="submit" id="btnStep1" class="btn text-white w-100 fw-bold" style="background-color: #8B1E28;">
+                    Enviar Código
+                </button>
             </form>
         </div>
 
-        <!-- PASO 2: Validar Código y Temporizador -->
+        <!-- PASO 2: INGRESAR CÓDIGO DE RECUPERACIÓN -->
         <div id="step2" class="d-none">
-            <div class="alert alert-warning text-center py-2 mb-3" style="font-size: 0.9rem;">
-                ⏱️ Tiempo restante del código: <strong id="timerDisplay">03:00</strong>
-            </div>
-            <form id="formStep2" novalidate>
+            <p class="text-muted small">Se ha enviado un código de 6 dígitos a su casilla de correo. Ingréselo a continuación:</p>
+            <form id="formStep2" onsubmit="validarCodigo(event)">
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Código de Verificación (6 dígitos) *</label>
-                    <input type="text" class="form-control text-center fs-4 fw-bold" id="inputCode" maxlength="6" placeholder="000000" required>
+                    <label class="form-label fw-bold">Código de Verificación</label>
+                    <input type="text" id="inputCodigo" class="form-control text-center fw-bold fs-4" placeholder="123456" maxlength="6" required>
                 </div>
-                <div class="d-flex justify-content-between align-items-center mb-3">
-                    <small class="text-muted">Intentos fallidos: <span id="intentosCount" class="badge bg-danger">0/3</span></small>
-                    <button type="button" class="btn btn-link btn-sm text-decoration-none p-0 fw-bold" style="color:#8B1E28;" onclick="reenviarCodigo()">🔄 Reenviar Código</button>
-                </div>
-                <button type="submit" class="btn btn-muni w-100 py-2 mb-3" id="btnValidarCodigo">Comprobar Código</button>
+                <button type="submit" id="btnStep2" class="btn text-white w-100 fw-bold" style="background-color: #8B1E28;">
+                    Verificar Código
+                </button>
             </form>
         </div>
 
-        <!-- PASO 3: Crear Nueva Contraseña -->
+        <!-- PASO 3: INGRESAR NUEVA CONTRASEÑA -->
         <div id="step3" class="d-none">
-            <form id="formStep3" novalidate>
+            <p class="text-muted small">Código verificado. Ingrese su nueva contraseña de acceso:</p>
+            <form id="formStep3" onsubmit="cambiarPassword(event)">
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Nueva Contraseña *</label>
-                    <input type="password" class="form-control" id="newPass" placeholder="Mínimo 8 caracteres" required>
+                    <label class="form-label fw-bold">Nueva Contraseña</label>
+                    <input type="password" id="inputNuevaClave" class="form-control" placeholder="••••••••" required minlength="6">
                 </div>
                 <div class="mb-3">
-                    <label class="form-label fw-bold">Confirmar Nueva Contraseña *</label>
-                    <input type="password" class="form-control" id="confirmPass" placeholder="Repita la nueva contraseña" required>
+                    <label class="form-label fw-bold">Confirmar Nueva Contraseña</label>
+                    <input type="password" id="inputConfirmarClave" class="form-control" placeholder="••••••••" required minlength="6">
                 </div>
-                <button type="submit" class="btn btn-muni w-100 py-2 mb-3">Actualizar Contraseña</button>
+                <button type="submit" id="btnStep3" class="btn text-white w-100 fw-bold" style="background-color: #8B1E28;">
+                    Guardar Nueva Contraseña
+                </button>
             </form>
         </div>
 
-        <div class="text-center mt-2">
-            <a href="index.html" class="text-decoration-none small text-secondary">← Cancelar y Volver al Login</a>
+        <div class="text-center mt-3 pt-2 border-top">
+            <a href="index.html" class="text-decoration-none small text-muted">← Volver al inicio de sesión</a>
         </div>
     </div>
 
@@ -73,177 +74,115 @@
             ? `${window.location.origin}/api` 
             : 'http://localhost:3000/api';
 
-        let codigoGenerado = "";
-        let usuarioOcorreoGlobal = "";
-        let intentos = 0;
-        let timerInterval = null;
-        let tiempoRestante = 180;
+        async function solicitarCodigo(e) {
+            e.preventDefault();
+            const correo = document.getElementById('inputCorreo').value.trim();
+            const btn = document.getElementById('btnStep1');
 
-        function iniciarTemporizador() {
-            clearInterval(timerInterval);
-            tiempoRestante = 180;
-            actualizarRelojUI();
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Verificando usuario...';
 
-            timerInterval = setInterval(() => {
-                tiempoRestante--;
-                actualizarRelojUI();
-
-                if (tiempoRestante <= 0) {
-                    clearInterval(timerInterval);
-                    document.getElementById('inputCode').disabled = true;
-                    document.getElementById('btnValidarCodigo').disabled = true;
-                    Swal.fire({
-                        title: 'Código Expirado',
-                        text: 'El código ha caducado. Por favor solicite un nuevo código.',
-                        icon: 'warning',
-                        confirmButtonColor: '#8B1E28'
-                    });
-                }
-            }, 1000);
-        }
-
-        function actualizarRelojUI() {
-            const min = Math.floor(tiempoRestante / 60);
-            const seg = tiempoRestante % 60;
-            document.getElementById('timerDisplay').textContent = `${min < 10 ? '0' + min : min}:${seg < 10 ? '0' + seg : seg}`;
-        }
-
-        async function solicitarCodigoServidor(correoOUsuario) {
             try {
-                usuarioOcorreoGlobal = correoOUsuario;
-                const res = await fetch(`${API}/recuperar-correo`, {
+                const response = await fetch(`${API}/recuperar-correo`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ correo: correoOUsuario })
+                    credentials: 'include',
+                    body: JSON.stringify({ correo })
                 });
 
-                const data = await res.json();
+                const json = await response.json();
 
-                if (data.success) {
-                    codigoGenerado = data.codigo;
-                    Swal.fire({
-                        title: '¡Código Generado!',
-                        html: `Se ha enviado el código a <b>${data.destino}</b>.<br><br><small class="text-muted">(Código activo para validación: <b>${data.codigo}</b>)</small>`,
-                        icon: 'success',
-                        confirmButtonColor: '#8B1E28'
-                    }).then(() => {
-                        document.getElementById('step1').classList.add('d-none');
-                        document.getElementById('step2').classList.remove('d-none');
-                        document.getElementById('flowTitle').textContent = 'Paso 2: Validar Código';
-                        document.getElementById('inputCode').disabled = false;
-                        document.getElementById('btnValidarCodigo').disabled = false;
-                        document.getElementById('inputCode').value = '';
-                        iniciarTemporizador();
-                    });
+                if (response.ok && json.success) {
+                    Swal.fire('¡Código Enviado!', json.message, 'success');
+                    document.getElementById('step1').classList.add('d-none');
+                    document.getElementById('step2').classList.remove('d-none');
                 } else {
-                    Swal.fire({
-                        title: 'No encontrado',
-                        text: data.message,
-                        icon: 'error',
-                        confirmButtonColor: '#8B1E28'
-                    });
+                    Swal.fire('Usuario No Encontrado', json.message || 'El correo ingresado no existe en nuestros registros.', 'error');
                 }
             } catch (err) {
-                Swal.fire({
-                    title: 'Error de servidor',
-                    text: 'Asegúrese de ejecutar node server.js en la terminal.',
-                    icon: 'error',
-                    confirmButtonColor: '#8B1E28'
-                });
+                Swal.fire('Error', 'No se pudo conectar con el servidor backend.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Enviar Código';
             }
         }
 
-        document.getElementById('formStep1').addEventListener('submit', function(e) {
+        async function validarCodigo(e) {
             e.preventDefault();
-            const val = document.getElementById('reqEmail').value.trim();
-            if (val) solicitarCodigoServidor(val);
-        });
+            const codigo = document.getElementById('inputCodigo').value.trim();
+            const btn = document.getElementById('btnStep2');
 
-        function reenviarCodigo() {
-            intentos = 0;
-            document.getElementById('intentosCount').textContent = '0/3';
-            solicitarCodigoServidor(usuarioOcorreoGlobal);
-        }
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Validando...';
 
-        document.getElementById('formStep2').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const inputVal = document.getElementById('inputCode').value.trim();
+            try {
+                const response = await fetch(`${API}/verificar-codigo-recuperacion`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({ codigo })
+                });
 
-            if (inputVal === codigoGenerado && tiempoRestante > 0) {
-                clearInterval(timerInterval);
-                Swal.fire({
-                    title: '¡Código Verificado!',
-                    text: 'Ingrese su nueva contraseña.',
-                    icon: 'success',
-                    confirmButtonColor: '#8B1E28'
-                }).then(() => {
+                const json = await response.json();
+
+                if (response.ok && json.success) {
+                    Swal.fire('¡Verificado!', json.message, 'success');
                     document.getElementById('step2').classList.add('d-none');
                     document.getElementById('step3').classList.remove('d-none');
-                    document.getElementById('flowTitle').textContent = 'Paso 3: Nueva Contraseña';
-                });
-            } else {
-                intentos++;
-                document.getElementById('intentosCount').textContent = `${intentos}/3`;
-
-                if (intentos >= 3) {
-                    clearInterval(timerInterval);
-                    Swal.fire({
-                        title: 'Intentos Agotados',
-                        text: 'Ha superado los 3 intentos. Reenviando nuevo código...',
-                        icon: 'error',
-                        confirmButtonColor: '#8B1E28'
-                    }).then(() => {
-                        reenviarCodigo();
-                    });
                 } else {
-                    Swal.fire({
-                        title: 'Código Incorrecto',
-                        text: 'Verifique los 6 dígitos e intente de nuevo.',
-                        icon: 'error',
-                        confirmButtonColor: '#8B1E28'
-                    });
+                    Swal.fire('Código Inválido', json.message || 'El código tipeado no coincide.', 'error');
                 }
+            } catch (err) {
+                Swal.fire('Error', 'Error al verificar el código.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Verificar Código';
             }
-        });
+        }
 
-        document.getElementById('formStep3').addEventListener('submit', async function(e) {
+        async function cambiarPassword(e) {
             e.preventDefault();
-            const pass = document.getElementById('newPass').value;
-            const confirm = document.getElementById('confirmPass').value;
+            const nuevaClave = document.getElementById('inputNuevaClave').value.trim();
+            const confirmarClave = document.getElementById('inputConfirmarClave').value.trim();
+            const btn = document.getElementById('btnStep3');
 
-            if (pass.length < 8 || pass !== confirm) {
-                Swal.fire({
-                    title: 'Contraseña inválida',
-                    text: 'Debe tener mínimo 8 caracteres y ambos campos deben coincidir.',
-                    icon: 'warning',
-                    confirmButtonColor: '#8B1E28'
-                });
+            if (nuevaClave !== confirmarClave) {
+                Swal.fire('Atención', 'Las contraseñas no coinciden.', 'warning');
                 return;
             }
 
+            btn.disabled = true;
+            btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Actualizando...';
+
             try {
-                const res = await fetch(`${API}/cambiar-password`, {
+                const response = await fetch(`${API}/cambiar-password-recuperado`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ correo: usuarioOcorreoGlobal, nuevaClave: pass })
+                    credentials: 'include',
+                    body: JSON.stringify({ nuevaClave })
                 });
 
-                const data = await res.json();
+                const json = await response.json();
 
-                if (data.success) {
+                if (response.ok && json.success) {
                     Swal.fire({
                         title: '¡Contraseña Actualizada!',
-                        text: 'La contraseña se ha modificado con éxito.',
+                        text: json.message,
                         icon: 'success',
                         confirmButtonColor: '#8B1E28'
                     }).then(() => {
                         window.location.href = 'index.html';
                     });
+                } else {
+                    Swal.fire('Error', json.message || 'No se pudo actualizar la clave.', 'error');
                 }
             } catch (err) {
-                Swal.fire({ title: 'Error', text: 'No se pudo actualizar la clave.', icon: 'error', confirmButtonColor: '#8B1E28' });
+                Swal.fire('Error', 'No se pudo conectar con el servidor.', 'error');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Guardar Nueva Contraseña';
             }
-        });
+        }
     </script>
 </body>
 </html>

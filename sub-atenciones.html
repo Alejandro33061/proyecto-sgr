@@ -24,10 +24,10 @@
         <div class="card p-3 shadow-sm border-0">
             <div class="row g-2 align-items-center mb-3">
                 <div class="col-md-5">
-                    <input type="text" id="busquedaSub" class="form-control" placeholder="Buscar por nombre, código o tipo..." oninput="filtrarSubAtenciones()">
+                    <input type="text" id="busquedaSub" class="form-control" placeholder="Buscar por nombre, código o tipo..." oninput="filtrarSubAtenciones(1)">
                 </div>
                 <div class="col-md-3">
-                    <select id="filtroEstadoSub" class="form-select" onchange="filtrarSubAtenciones()">
+                    <select id="filtroEstadoSub" class="form-select" onchange="filtrarSubAtenciones(1)">
                         <option value="">Todos los estados</option>
                         <option value="ACTIVO">ACTIVO</option>
                         <option value="INACTIVO">INACTIVO</option>
@@ -61,6 +61,17 @@
                     </tbody>
                 </table>
             </div>
+
+            <!-- PIE DE PAGINACIÓN -->
+            <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top">
+                <div class="text-muted small fw-bold" id="infoPaginacionSub">
+                    Mostrando 0 a 0 de 0 registros
+                </div>
+                <nav aria-label="Navegación de páginas">
+                    <ul class="pagination pagination-sm m-0" id="paginadorSub">
+                    </ul>
+                </nav>
+            </div>
         </div>
     </div>
 
@@ -74,11 +85,60 @@
 
         let listaSubAtenciones = [];
         let listaTiposPadre = [];
+        let paginaActual = 1;
+        const limitePorPagina = 5;
 
-        document.addEventListener('DOMContentLoaded', () => {
-            cargarTiposPadre();
-            cargarSubAtencionesBD();
+        document.addEventListener('DOMContentLoaded', async () => {
+            fetch('navbar.html')
+                .then(res => res.text())
+                .then(html => {
+                    document.getElementById('navbar-container').innerHTML = html;
+                    marcarBotonActivo();
+                    sincronizarSesionYNavbar();
+                });
+
+            await cargarTiposPadre();
+            cargarSubAtencionesBD(1);
         });
+
+        function marcarBotonActivo() {
+            let pag = window.location.pathname.split("/").pop();
+            if (!pag || pag === '') pag = 'sub-atenciones.html';
+
+            const enlaces = document.querySelectorAll('#navPublicMenu .nav-link-item');
+            enlaces.forEach(enlace => {
+                if (enlace.getAttribute('href') === pag) {
+                    enlace.classList.add('activo-fijo');
+                } else {
+                    enlace.classList.remove('activo-fijo');
+                }
+            });
+        }
+
+        async function sincronizarSesionYNavbar() {
+            try {
+                const response = await fetch(`${API}/sesion-actual?t=${new Date().getTime()}`, {
+                    method: 'GET',
+                    credentials: 'include',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.usuario) {
+                        const usr = data.usuario;
+                        localStorage.setItem('sgr_user', JSON.stringify(usr));
+
+                        const elNombre = document.getElementById('usrHeaderNombre');
+                        const elRol = document.getElementById('usrHeaderRol');
+                        if (elNombre) elNombre.textContent = usr.nombre || usr.nombre_usuario;
+                        if (elRol) elRol.textContent = usr.rol;
+                    }
+                }
+            } catch (error) {
+                console.error('Error al sincronizar sesión:', error);
+            }
+        }
 
         async function cargarTiposPadre() {
             try {
@@ -88,15 +148,43 @@
             } catch (e) { console.error(e); }
         }
 
-        async function cargarSubAtencionesBD() {
+        async function cargarSubAtencionesBD(pagina = 1) {
+            paginaActual = pagina;
             try {
                 const response = await fetch(`${API}/sub-atenciones`, { credentials: 'include' });
                 const json = await response.json();
                 if (json.success) {
-                    listaSubAtenciones = json.datos.sort((a, b) => (a.id_sub || a.id_sub_atencion) - (b.id_sub || b.id_sub_atencion));
-                    renderTablaSubAtenciones(listaSubAtenciones);
+                    // Ordenamiento por el número del código (SAT-0101, SAT-0102, SAT-0201, etc.)
+                    listaSubAtenciones = json.datos.sort((a, b) => {
+                        const numA = parseInt((a.codigo ? a.codigo.match(/\d+/) : [0]) || [0], 10);
+                        const numB = parseInt((b.codigo ? b.codigo.match(/\d+/) : [0]) || [0], 10);
+                        return numA - numB;
+                    });
+                    filtrarSubAtenciones(paginaActual);
                 }
             } catch (error) { console.error(error); }
+        }
+
+        function filtrarSubAtenciones(pagina = 1) {
+            paginaActual = pagina;
+            const texto = document.getElementById('busquedaSub').value.toLowerCase();
+            const estado = document.getElementById('filtroEstadoSub').value;
+
+            const filtrados = listaSubAtenciones.filter(sa => {
+                const coincideTexto = sa.nombre.toLowerCase().includes(texto) || sa.codigo.toLowerCase().includes(texto) || (sa.tipo_asociado || '').toLowerCase().includes(texto);
+                const coincideEstado = estado === '' || sa.estado === estado;
+                return coincideTexto && coincideEstado;
+            });
+
+            const totalRegistros = filtrados.length;
+            const totalPaginas = Math.ceil(totalRegistros / limitePorPagina) || 1;
+            
+            const inicio = (paginaActual - 1) * limitePorPagina;
+            const fin = inicio + limitePorPagina;
+            const datosPagina = filtrados.slice(inicio, fin);
+
+            renderTablaSubAtenciones(datosPagina);
+            renderizarPaginador(totalRegistros, totalPaginas, totalRegistros > 0 ? inicio + 1 : 0, Math.min(fin, totalRegistros));
         }
 
         function renderTablaSubAtenciones(datos) {
@@ -125,17 +213,39 @@
             });
         }
 
-        function filtrarSubAtenciones() {
-            const texto = document.getElementById('busquedaSub').value.toLowerCase();
-            const estado = document.getElementById('filtroEstadoSub').value;
+        function renderizarPaginador(totalRegistros, totalPaginas, desde, hasta) {
+            const infoText = document.getElementById('infoPaginacionSub');
+            const ulPaginador = document.getElementById('paginadorSub');
 
-            const filtrados = listaSubAtenciones.filter(sa => {
-                const coincideTexto = sa.nombre.toLowerCase().includes(texto) || sa.codigo.toLowerCase().includes(texto) || (sa.tipo_asociado || '').toLowerCase().includes(texto);
-                const coincideEstado = estado === '' || sa.estado === estado;
-                return coincideTexto && coincideEstado;
-            });
+            if (totalRegistros === 0) {
+                infoText.textContent = 'Mostrando 0 a 0 de 0 registros';
+                ulPaginador.innerHTML = '';
+                return;
+            } else {
+                infoText.textContent = `Mostrando ${desde} a ${hasta} de ${totalRegistros} registros`;
+            }
 
-            renderTablaSubAtenciones(filtrados);
+            ulPaginador.innerHTML = '';
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginaActual === 1 ? 'disabled' : ''}">
+                    <button class="page-link" onclick="filtrarSubAtenciones(${paginaActual - 1})">Anterior</button>
+                </li>
+            `;
+
+            for (let i = 1; i <= totalPaginas; i++) {
+                ulPaginador.innerHTML += `
+                    <li class="page-item ${i === paginaActual ? 'active' : ''}">
+                        <button class="page-link" ${i === paginaActual ? 'style="background-color: #8B1E28; border-color: #8B1E28;"' : ''} onclick="filtrarSubAtenciones(${i})">${i}</button>
+                    </li>
+                `;
+            }
+
+            ulPaginador.innerHTML += `
+                <li class="page-item ${paginaActual === totalPaginas ? 'disabled' : ''}">
+                    <button class="page-link" onclick="filtrarSubAtenciones(${paginaActual + 1})">Siguiente</button>
+                </li>
+            `;
         }
 
         function modalNuevaSubAtencion() {
@@ -146,8 +256,8 @@
                 html: `
                     <div class="text-start" style="font-size: 0.9rem;">
                         <div class="mb-2">
-                            <label class="fw-bold mb-1">Código *</label>
-                            <input id="sw-sa-codigo" class="form-control" placeholder="Ej: SA001">
+                            <label class="fw-bold mb-1">Código (Opcional - Autogenerado)</label>
+                            <input id="sw-sa-codigo" class="form-control" placeholder="Ej: SAT-0104 (Dejar vacío para automático)">
                         </div>
                         <div class="mb-2">
                             <label class="fw-bold mb-1">Nombre Sub Atención *</label>
@@ -172,14 +282,14 @@
                 confirmButtonColor: '#8B1E28',
                 confirmButtonText: 'Guardar',
                 preConfirm: () => {
-                    const codigo = document.getElementById('sw-sa-codigo').value.trim();
+                    const codigoInput = document.getElementById('sw-sa-codigo').value.trim();
                     const nombre = document.getElementById('sw-sa-nombre').value.trim();
-                    if (!codigo || !nombre) {
-                        Swal.showValidationMessage('El Código y Nombre son obligatorios.');
+                    if (!nombre) {
+                        Swal.showValidationMessage('El Nombre es obligatorio.');
                         return false;
                     }
                     return {
-                        codigo,
+                        codigo: codigoInput,
                         nombre,
                         id_tipo_atencion: document.getElementById('sw-sa-tipo').value,
                         estado: document.getElementById('sw-sa-est').value
@@ -187,14 +297,19 @@
                 }
             }).then(async (result) => {
                 if (result.isConfirmed) {
-                    await fetch(`${API}/sub-atenciones`, {
+                    const res = await fetch(`${API}/sub-atenciones`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         credentials: 'include',
                         body: JSON.stringify(result.value)
                     });
-                    Swal.fire('¡Guardado!', 'Sub Atención agregada.', 'success');
-                    cargarSubAtencionesBD();
+                    const json = await res.json();
+                    if (json.success) {
+                        Swal.fire('¡Guardado!', `Sub Atención agregada (${json.codigo}).`, 'success');
+                        cargarSubAtencionesBD(paginaActual);
+                    } else {
+                        Swal.fire('Error', json.message, 'error');
+                    }
                 }
             });
         }
@@ -209,7 +324,7 @@
             }).join('');
 
             Swal.fire({
-                title: `Editar Sub Atención`,
+                title: `Editar Sub Atención #${id}`,
                 html: `
                     <div class="text-start" style="font-size: 0.9rem;">
                         <div class="mb-2">
@@ -263,7 +378,7 @@
                     const json = await res.json();
                     if (json.success) {
                         Swal.fire('¡Actualizado!', 'Sub atención modificada.', 'success');
-                        cargarSubAtencionesBD();
+                        cargarSubAtencionesBD(paginaActual);
                     } else {
                         Swal.fire('Error', json.message, 'error');
                     }
@@ -285,7 +400,7 @@
                     const json = await response.json();
                     if (json.success) {
                         Swal.fire('¡Eliminado!', 'Sub atención removida.', 'success');
-                        cargarSubAtencionesBD();
+                        cargarSubAtencionesBD(paginaActual);
                     } else {
                         Swal.fire('Operación Bloqueada', json.message, 'error');
                     }

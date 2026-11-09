@@ -10,31 +10,8 @@
 </head>
 <body class="min-vh-100" style="background-color: #f4f6f9;">
 
-    <!-- BARRA DE NAVEGACIÓN ESTANDARIZADA -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-muni shadow-sm">
-        <div class="container-fluid">
-            <a class="navbar-brand fw-bold" href="dashboard.html">Muni La Serena</a>
-            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#menuPrincipal">
-                <span class="navbar-toggler-icon"></span>
-            </button>
-            <div class="collapse navbar-collapse" id="menuPrincipal">
-                <ul class="navbar-nav me-auto">
-                    <li class="nav-item"><a class="nav-link text-white" href="dashboard.html">📊 Gestión Territorial</a></li>
-                    <li class="nav-item"><a class="nav-link active" href="actividad.html">📝 Ingreso de Atención</a></li>
-                    <li class="nav-item"><a class="nav-link text-white" href="validar.html">📷 Validar Evidencias</a></li>
-                    <li class="nav-item"><a class="nav-link text-white" href="mantenedores.html">⚙️ Mantenedores CRUD</a></li>
-                    <li class="nav-item"><a class="nav-link text-white" href="reportes.html">📥 Reportes</a></li>
-                </ul>
-                <div class="d-flex align-items-center gap-3 text-white">
-                    <div class="text-end" style="font-size: 0.85rem; line-height: 1.2;">
-                        <span class="fw-bold d-block" id="usrHeaderNombre">...</span>
-                        <span class="badge bg-warning text-dark" id="usrHeaderRol">...</span>
-                    </div>
-                    <button class="btn btn-outline-light btn-sm" onclick="cerrarSesion()">Cerrar Sesión</button>
-                </div>
-            </div>
-        </div>
-    </nav>
+    <!-- NAVBAR CENTRALIZADO -->
+    <div id="navbar-container"></div>
 
     <!-- CONTENIDO DEL FORMULARIO -->
     <div class="container mt-5 mb-5" style="max-width: 850px;">
@@ -46,9 +23,8 @@
                 <div class="row mb-3">
                     <div class="col-md-4">
                         <label class="form-label fw-bold">RUT Solicitante *</label>
-                        <!-- Se agregó pattern para validar formato RUT -->
-                        <input type="text" class="form-control" id="rutSolicitante" placeholder="Ej: 15432890-1" pattern="^[0-9]+-[0-9Kk]$" required>
-                        <div class="invalid-feedback">Ingrese un RUT válido sin puntos y con guion.</div>
+                        <input type="text" class="form-control" id="rutSolicitante" placeholder="Ej: 15432890-1" pattern="^[0-9]+-[0-9Kk]$" required onblur="this.value = formatearRUT(this.value)">
+                        <div class="invalid-feedback">Ingrese un RUT válido de vecino (Ej: 12345678-9).</div>
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Nombre y Apellido *</label>
@@ -57,41 +33,29 @@
                     </div>
                     <div class="col-md-4">
                         <label class="form-label fw-bold">Fecha de Registro *</label>
-                        <input type="date" class="form-control" id="fechaRegistro" required>
+                        <input type="date" class="form-control bg-light" id="fechaRegistro" readonly required>
                     </div>
                 </div>
 
-                <!-- Fila 2: Delegación y Responsable -->
+                <!-- Fila 2: Delegación (Asignada por perfil) y Responsable -->
                 <div class="row mb-3">
                     <div class="col-md-6">
-                        <label class="form-label fw-bold">Delegación Afectada *</label>
-                        <select class="form-select" id="selectDelegacion" required>
-                            <option value="" selected disabled>Seleccione...</option>
-                            <option value="Todas (Comunal)">Todas (Comunal)</option>
-                            <option value="Avenida del Mar">Avenida del Mar</option>
-                            <option value="Sector Centro">Sector Centro</option>
-                            <option value="La Antena / La Florida">La Antena / La Florida</option>
-                            <option value="Las Compañías">Las Compañías</option>
-                            <option value="La Pampa">La Pampa</option>
-                            <option value="Rural">Rural</option>
-                        </select>
-                        <div class="invalid-feedback">Seleccione una delegación.</div>
+                        <label class="form-label fw-bold">Delegación de Atención *</label>
+                        <input type="text" class="form-control bg-light" id="selectDelegacion" readonly style="background-color: #e9ecef;" required>
+                        <small class="text-muted" style="font-size: 0.78rem;">Contexto asignado según el perfil del usuario en sesión.</small>
                     </div>
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Usuario Responsable *</label>
-                        <input type="text" class="form-control text-muted" id="inputResponsable" readonly style="background-color: #f8f9fa;">
+                        <input type="text" class="form-control bg-light" id="inputResponsable" readonly style="background-color: #e9ecef;" required>
                     </div>
                 </div>
 
-                <!-- Fila 3: Tipo y Sub Atención -->
+                <!-- Fila 3: Tipo y Sub Atención Cargar desde BD -->
                 <div class="row mb-3">
                     <div class="col-md-6">
                         <label class="form-label fw-bold">Tipo de Atención *</label>
                         <select class="form-select" id="tipoAtencion" required>
-                            <option value="" selected disabled>Seleccione Tipo...</option>
-                            <option value="Asistencia Social">Asistencia Social</option>
-                            <option value="Infraestructura y Obras">Infraestructura y Obras</option>
-                            <option value="Aseo y Ornato">Aseo y Ornato</option>
+                            <option value="" selected disabled>Cargando tipos...</option>
                         </select>
                         <div class="invalid-feedback">Seleccione un tipo de atención.</div>
                     </div>
@@ -107,14 +71,14 @@
                 <!-- Fila 4: Descripción -->
                 <div class="mb-4">
                     <label class="form-label fw-bold">Descripción del Requerimiento *</label>
-                    <textarea class="form-control" id="descripcionRequerimiento" rows="3" required minlength="10" placeholder="Detalle la solicitud..."></textarea>
+                    <textarea class="form-control" id="descripcionRequerimiento" rows="3" required minlength="10" placeholder="Describa la solicitud y los antecedentes necesarios..."></textarea>
                     <div class="invalid-feedback">Debe ingresar una descripción de al menos 10 caracteres.</div>
                 </div>
 
                 <!-- Botones -->
                 <div class="d-flex gap-3 justify-content-center mt-4">
                     <a href="dashboard.html" class="btn btn-secondary px-5 py-2">Cancelar</a>
-                    <button type="submit" class="btn text-white px-5 py-2" style="background-color: #8B1E28;">Registrar Atención Territorial</button>
+                    <button type="submit" class="btn text-white px-5 py-2" style="background-color: #8B1E28;">Guardar atención</button>
                 </div>
             </form>
         </div>
@@ -122,48 +86,81 @@
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <script src="navbar.js"></script>
     
     <script>
-        // 1. Cargar Sesión y Fecha actual al abrir la página
-        document.addEventListener('DOMContentLoaded', () => {
-            const raw = localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user');
-            if (!raw) {
-                window.location.href = 'index.html';
-                return;
-            }
-            
-            const usr = JSON.parse(raw);
-            document.getElementById('usrHeaderNombre').textContent = usr.nombre || usr.nombre_usuario;
-            document.getElementById('usrHeaderRol').textContent = usr.rol;
-            
-            // Asignar el responsable al campo readonly del formulario
-            document.getElementById('inputResponsable').value = usr.nombre || usr.nombre_usuario;
+        const API = window.location.protocol.startsWith('http') 
+            ? `${window.location.origin}/api` 
+            : 'http://localhost:3000/api';
 
-            // Fijar fecha por defecto
-            document.getElementById('fechaRegistro').valueAsDate = new Date();
-        });
+        let tiposAtencionBD = [];
+        let subAtencionesBD = [];
 
-        // Lógica de cierre de sesión
-        function cerrarSesion() {
-            localStorage.removeItem('sgr_user');
-            sessionStorage.removeItem('sgr_user');
-            window.location.href = 'index.html';
+        function formatearRUT(rut) {
+            if (!rut) return '';
+            let valor = rut.replace(/[^0-9kK]/g, '').toUpperCase();
+            if (valor.length < 2) return valor;
+            let cuerpo = valor.slice(0, -1);
+            let dv = valor.slice(-1);
+            return `${cuerpo}-${dv}`;
         }
 
-        // 2. Lógica de los selects en cadena (Tipo -> Sub Atención)
-        const subs = {
-            "Asistencia Social": ["Caja de Alimentos", "Subsidio de Agua", "Asistencia Adulto Mayor"],
-            "Infraestructura y Obras": ["Reparación de Luminarias", "Bacheo de Calles", "Mantención de Plazas"],
-            "Aseo y Ornato": ["Retiro de Escombros", "Corte de Pasto", "Microbasurales"]
-        };
+        document.addEventListener('DOMContentLoaded', async () => {
+            const raw = localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user');
+            if (raw) {
+                const usr = JSON.parse(raw);
+                document.getElementById('inputResponsable').value = usr.nombre || usr.nombre_usuario || 'Operador';
+                document.getElementById('selectDelegacion').value = (usr.delegacion || 'Sector Centro') + ' [Asignada por perfil]';
+            }
+            document.getElementById('fechaRegistro').valueAsDate = new Date();
+
+            await cargarCatalogosAtencionBD();
+        });
+
+        async function cargarCatalogosAtencionBD() {
+            try {
+                const rawUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user') || '{}');
+                const userDelegacion = rawUser.delegacion || 'Sector Centro';
+
+                const [resTipos, resSubs] = await Promise.all([
+                    fetch(`${API}/tipos-atencion`, { credentials: 'include' }),
+                    fetch(`${API}/sub-atenciones`, { credentials: 'include' })
+                ]);
+
+                const jsonTipos = await resTipos.json();
+                const jsonSubs = await resSubs.json();
+
+                if (jsonTipos.success) tiposAtencionBD = jsonTipos.datos;
+                if (jsonSubs.success) subAtencionesBD = jsonSubs.datos;
+
+                const selectTipo = document.getElementById('tipoAtencion');
+                selectTipo.innerHTML = '<option value="" selected disabled>Seleccione Tipo...</option>';
+                
+                // FILTRADO DINÁMICO DE TIPOS POR DELEGACIÓN DEL USUARIO
+                const tiposDisponibles = tiposAtencionBD.filter(t => 
+                    t.estado === 'ACTIVO' && 
+                    (!t.delegacion || t.delegacion.includes('Todas') || t.delegacion === userDelegacion)
+                );
+
+                tiposDisponibles.forEach(t => {
+                    selectTipo.innerHTML += `<option value="${t.nombre}">${t.nombre}</option>`;
+                });
+            } catch (e) {
+                console.error("Error al cargar categorías:", e);
+            }
+        }
 
         document.getElementById('tipoAtencion').addEventListener('change', function() {
             const subSel = document.getElementById('subAtencion');
+            const tipoSeleccionado = this.value;
             subSel.innerHTML = '<option value="" selected disabled>Seleccione Sub Atención...</option>';
             
-            if(subs[this.value]) {
-                subs[this.value].forEach(item => {
-                    subSel.innerHTML += `<option value="${item}">${item}</option>`;
+            // FILTRADO DE SUB ATENCIONES PERTENECIENTES AL TIPO SELECCIONADO
+            const subsFiltradas = subAtencionesBD.filter(s => s.tipo_asociado === tipoSeleccionado && s.estado === 'ACTIVO');
+
+            if(subsFiltradas.length > 0) {
+                subsFiltradas.forEach(item => {
+                    subSel.innerHTML += `<option value="${item.nombre}">${item.nombre}</option>`;
                 });
                 subSel.disabled = false;
             } else {
@@ -171,11 +168,13 @@
             }
         });
 
-        // 3. Validación y Envío a la Base de Datos (POST)
         document.getElementById('formAtencion').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            // Verificación HTML5 de campos
+            let rutVal = document.getElementById('rutSolicitante').value.trim();
+            rutVal = formatearRUT(rutVal);
+            document.getElementById('rutSolicitante').value = rutVal;
+
             if (!this.checkValidity()) {
                 e.stopPropagation();
                 this.classList.add('was-validated');
@@ -183,30 +182,29 @@
             }
             this.classList.add('was-validated');
 
-            // Capturar datos del formulario
+            const rawUser = JSON.parse(localStorage.getItem('sgr_user') || sessionStorage.getItem('sgr_user') || '{}');
+
             const datosAtencion = {
-                rut_solicitante: document.getElementById('rutSolicitante').value.trim(),
-                nombre_solicitante: document.getElementById('nombreSolicitante').value.trim(),
+                rut: rutVal,
+                solicitante: document.getElementById('nombreSolicitante').value.trim(),
                 fecha_registro: document.getElementById('fechaRegistro').value,
-                delegacion: document.getElementById('selectDelegacion').value,
-                usuario_responsable: document.getElementById('inputResponsable').value,
+                delegacion: rawUser.delegacion || 'Sector Centro',
+                usuario_responsable: rawUser.nombre || rawUser.nombre_usuario || 'Operador',
                 tipo_atencion: document.getElementById('tipoAtencion').value,
                 sub_atencion: document.getElementById('subAtencion').value,
-                descripcion: document.getElementById('descripcionRequerimiento').value.trim()
+                descripcion: document.getElementById('descripcionRequerimiento').value.trim(),
+                estado: 'PENDIENTE'
             };
 
             try {
-                // Bloquear botón para evitar múltiples envíos
                 const btnSubmit = this.querySelector('button[type="submit"]');
                 btnSubmit.disabled = true;
-                btnSubmit.innerHTML = 'Registrando... <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>';
+                btnSubmit.innerHTML = 'Guardando... <span class="spinner-border spinner-border-sm"></span>';
 
-                // Petición POST al backend
-                const response = await fetch('http://localhost:3000/api/atenciones', {
+                const response = await fetch(`${API}/atenciones`, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
                     body: JSON.stringify(datosAtencion)
                 });
 
@@ -215,26 +213,24 @@
                 if (result.success) {
                     Swal.fire({
                         title: '¡Atención Registrada!',
-                        text: 'Se ha ingresado el requerimiento territorial con éxito en la base de datos.',
+                        text: 'La atención ha sido guardada en la base de datos.',
                         icon: 'success',
                         confirmButtonColor: '#8B1E28'
                     }).then(() => {
                         window.location.href = 'dashboard.html';
                     });
                 } else {
-                    Swal.fire('Error', result.message || 'No se pudo guardar la atención', 'error');
+                    Swal.fire('Error MySQL', result.message || 'No se pudo guardar la atención', 'error');
                     btnSubmit.disabled = false;
-                    btnSubmit.innerHTML = 'Registrar Atención Territorial';
+                    btnSubmit.innerHTML = 'Guardar atención';
                 }
 
             } catch (error) {
-                console.error("Error en la petición:", error);
-                Swal.fire('Error de Conexión', 'No se pudo conectar con el servidor. Verifica que Node esté ejecutándose.', 'error');
-                
-                // Restaurar botón
+                console.error("Error:", error);
+                Swal.fire('Error', 'No se pudo conectar con el servidor.', 'error');
                 const btnSubmit = this.querySelector('button[type="submit"]');
                 btnSubmit.disabled = false;
-                btnSubmit.innerHTML = 'Registrar Atención Territorial';
+                btnSubmit.innerHTML = 'Guardar atención';
             }
         });
     </script>
